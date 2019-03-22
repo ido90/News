@@ -1,0 +1,7 @@
+https://www.datacamp.com/community/tutorials/tutorial-python-beautifulsoup-datacamp-tutorials
+
+https://www.datacamp.com/community/tutorials/making-web-crawlers-scrapy-python
+
+https://www.datacamp.com/community/tutorials/web-scraping-using-python
+
+https://www.datacamp.com/courses
