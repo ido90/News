@@ -109,6 +109,28 @@ def save_data_frame(df, path, sheet_name='sheet'):
     writer.save()
     writer.close()
 
+def load_data_frame(path, sheets=None, verbose=1):
+    if path[-5:] != '.xlsx': path += '.xlsx'
+    if sheets is None:
+        i = 0
+        df = pd.read_excel(path,i)
+        while True:
+            i += 1
+            try:
+                df = pd.concat([df, pd.read_excel(path, i)])
+            except IndexError:
+                break
+        if verbose >= 1:
+            print(f'Sheets read: {i:d}')
+    else:
+        df = pd.read_excel(path,sheets[0])
+        df['source'] = sheets[0]
+        for s in sheets[1:]:
+            df2 = pd.read_excel(path, s)
+            df2['source'] = s
+            df = pd.concat([df, df2])
+    return df
+
 def get_articles_data(urls, get_data_fun,
                       section=None, urls_titles=None, save_to=None,
                       update_freq=10, verbose=2):

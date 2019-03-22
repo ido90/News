@@ -15,7 +15,10 @@ import Scrapper.ScrapperTools as st
 
 '''
 Status: unfortunately, most requests returned empty HTMLs. Not sure why
-(maybe non-deterministic prevention of many requests from single IP?).
+(maybe non-deterministic prevention of many requests from single IP,
+or detection of any bot-related properties in the request?).
+In addition, the few valid HTMLs were failed to be parsed correctly.
+Gave up on this one.
 '''
 
 def get_homepage(url="https://www.israelhayom.co.il"):
@@ -101,11 +104,12 @@ def get_article_data(url):
         )
     except:
         warn(f"Could not process URL: {url:s}")
-        #return 'IRRELEVANT_PAGE'
-        raise
-    subtitle = soup.find_all(class_='field-item')
-    subtitle = subtitle[0].text if subtitle else None
-
+        return 'IRRELEVANT_PAGE'
+    try:
+        subtitle = soup.find_all(class_='field-item')
+        subtitle = subtitle[0].text if subtitle else None
+    except:
+        subtitle = None
     author_date = soup.find_all(class_='art_header_footer_author')
     try:
         author_itr = author_date[0].children
@@ -113,12 +117,13 @@ def get_article_data(url):
         while 'authorHtmlCss' in author:
             author = next(author_itr).text
     except:
-        author = ''
-    date = author_date[1].text
-
-    # process data
-    date = re.findall('[0-3][0-9]\.[0-1][0-9]\.[0-2][0-9]',date)[0]
-    date = datetime.strptime(date, '%d.%m.%y').date()
+        author = None
+    try:
+        date = author_date[1].text
+        date = re.findall('[0-3][0-9]\.[0-1][0-9]\.[0-2][0-9]',date)[0]
+        date = datetime.strptime(date, '%d.%m.%y').date()
+    except:
+        date = None
 
     return {'url':url, 'title':title, 'subtitle':subtitle,
             'author':author, 'date':date, 'text':text}
