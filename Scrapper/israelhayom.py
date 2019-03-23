@@ -54,7 +54,7 @@ def get_all_articles(urls, sections_titles, verbose=1, demo=False):
     articles = dict()
     for url,section in zip(urls,sections_titles):
         articles[section] = \
-            get_section_articles(st.url2html(url,5,False,2),
+            get_section_articles(st.url2html(url,5,False,2,set_user_agent=True),
                                  section, verbose=verbose, demo=demo)
     return articles
 
@@ -86,7 +86,7 @@ def get_articles_data(sections, save_to=None,
 def get_article_data(url):
     # get page
     try:
-        soup = st.url2html(url, error_on_failure=False)
+        soup = st.url2html(url, error_on_failure=False, set_user_agent=True)
     except:
         warn(f'Bad URL: {url:s}')
         return 'BAD_URL'

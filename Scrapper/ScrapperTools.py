@@ -8,6 +8,7 @@ from pprint import pprint
 from warnings import warn
 from datetime import datetime
 from urllib.request import urlopen
+import requests
 from bs4 import BeautifulSoup
 from openpyxl import load_workbook
 
@@ -195,11 +196,16 @@ def soup2file(path, url=None, html=None, soup=None):
     with io.open(path, "w", encoding="utf-8") as f:
         f.write(str(soup))
 
-def url2html(url, attempts=3,
-             error_on_failure=True, verbose=0, convert_to_none=False):
+def url2html(url, attempts=3, error_on_failure=True, verbose=0,
+             convert_to_none=False, set_user_agent=False):
     soup = None
     for i in range(attempts):
-        soup = BeautifulSoup(urlopen(url), 'lxml')
+        if set_user_agent:
+            headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+            response = requests.get(url, headers=headers)
+            soup = BeautifulSoup(response.text, 'html.parser')
+        else:
+            soup = BeautifulSoup(urlopen(url), 'lxml')
         if not str(soup).startswith(r'<html><head><meta charset'):
             break
     if error_on_failure and str(soup).startswith(r'<html><head><meta charset'):

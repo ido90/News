@@ -14,12 +14,8 @@ from bs4 import BeautifulSoup
 import Scrapper.ScrapperTools as st
 
 '''
-Status:
-- HTMLs are very structured with convenient and distinctive labels, which
-makes life easier.
-- However, most pages contents are blocked, and most HTMLs are different
-between browser and urllib for reasons I don't know
-(maybe different default flags in the GET requests).
+Status: HTMLs are very structured with convenient and distinctive labels,
+which makes life easier. ~300 articles were successfully scrapped.
 '''
 
 SECTIONS = (['https://www.haaretz.co.il/news',
@@ -74,11 +70,10 @@ def get_article_data(url):
         return get_tm_article_data(url)
     # get page
     try:
-        html = urlopen(url)
+        soup = st.url2html(url, error_on_failure=False, set_user_agent=True)
     except:
         warn(f'Bad URL: {url:s}')
         return 'BAD_URL'
-    soup = BeautifulSoup(html, 'lxml')
     # get data from page
     try:
         title = soup.find_all('title')[0].text

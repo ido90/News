@@ -15,7 +15,10 @@ import Scrapper.ScrapperTools as st
 
 '''
 Status: unfortunately, most requests returned empty HTMLs. Not sure why
-(maybe non-deterministic prevention of many requests from single IP?).
+(maybe non-deterministic prevention of many requests from single IP,
+or detection of any bot-related properties in the request?).
+In addition, the few valid HTMLs were failed to be parsed correctly.
+Gave up on this one.
 '''
 
 def get_homepage(url="https://www.makorrishon.co.il/"):
@@ -49,7 +52,7 @@ def get_all_articles(urls, sections_titles, verbose=1, demo=False):
     articles = dict()
     for url,section in zip(urls,sections_titles):
         articles[section] = \
-            get_section_articles(st.url2html(url,3,False,1),
+            get_section_articles(st.url2html(url,3,False,2,False,True),
                                  section, verbose=verbose, demo=demo)
     return articles
 
@@ -83,7 +86,7 @@ def get_articles_data(sections, save_to=None,
 def get_article_data(url):
     # get page
     try:
-        soup = st.url2html(url,3,False)
+        soup = st.url2html(url,3,False,set_user_agent=True)
     except:
         warn(f'Bad URL: {url:s}')
         return 'BAD_URL'
