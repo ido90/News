@@ -19,10 +19,15 @@ import Scrapper.ScrapperTools as st
 def load_data(path,
               sheets=('ynet', 'mako', 'haaretz'),
               filter_str=('source','title','text'),
+              force_string=('title','subtitle','text','url','link_title',
+                            'author','section','source'),
               verbose=1):
     df = st.load_data_frame(path, sheets=sheets, verbose=verbose)
     for h in filter_str:
         df = df[[(isinstance(t, str) and len(t)>0) for t in df[h].values]]
+    pd.options.mode.chained_assignment = None
+    for col in force_string:
+        df.loc[[not isinstance(s,str) for s in df[col]], col] = ''
     df['blocked'] = [src=='haaretz' and txt.endswith('...')
                      for src,txt in zip(df['source'], df['text'])]
     return df
@@ -62,7 +67,7 @@ def barplot(ax, x, y, bottom=None, plot_bottom=True,
             for tick in ax.get_xticklabels():
                 tick.set_rotation(90)
 
-def bar_per_source(ax, df, ylab, fun, title=None, ylim=None,
+def bar_per_source(ax, df, fun, ylab, title,
                    colors='black', bcolors=DEF_COLORS):
     sources = np.unique(df.source)
     barplot(ax, sources,
@@ -78,6 +83,24 @@ def clean_figure(ax):
     ax.set_xticklabels(())
     ax.set_yticklabels(())
 
+def count(txt, sep):
+    if isinstance(txt,str):
+        return len(list(filter(None,re.split(sep,txt))))
+    else:
+        return [len(list(filter(None,re.split(sep,s)))) for s in txt]
+def count_words(txt, sep=' |\t|\n\r|\n'):
+    return count(txt,sep)
+def count_sentences(txt, sep='\. |\.\n|\.\r'):
+    return count(txt,sep)
+def count_paragraphs(txt, sep='\n|\n\r'):
+    return count(txt,sep)
+
+def draw():
+    plt.get_current_fig_manager().window.showMaximized()
+    plt.draw()
+    plt.pause(1e-17)
+    plt.tight_layout()
+
 ############## ANALYSIS ##############
 
 def data_description(df):
@@ -85,13 +108,13 @@ def data_description(df):
     n = len(sources)
     f, axs = plt.subplots(2, n)
     # counters per source
-    bar_per_source(axs[0,0], df, 'Articles\n(black = partially blocked contents)',
-                   lambda d: d.shape[0], '\nArticles per Source')
+    bar_per_source(axs[0,0], df, ylab='Articles\n(black = partially blocked contents)',
+                   fun=lambda d: d.shape[0], title='\nArticles per Source')
     bar_per_source(axs[0,1], df,
-                   'Words [x1000]\n(black = partially blocked contents)',
-                   lambda d: sum(len(l.split()) for t in d['text'].values
-                                 for l in t.split('\n')) / 1e3,
-                   'BASIC DATA DESCRIPTION\nWords per Source')
+                   ylab='Words [x1000]\n(black = partially blocked contents)',
+                   fun=lambda d: sum(len(l.split()) for t in d['text'].values
+                                     for l in t.split('\n')) / 1e3,
+                   title='BASIC DATA DESCRIPTION\nWords per Source')
     # remove blocked haaretz texts before analysis
     df = df[np.logical_not(df['blocked'])]
     # sections per source
@@ -117,9 +140,7 @@ def data_description(df):
     author_concentration(axs[1,1], df)
     top_authors(axs[1,2], df)
     # draw
-    plt.get_current_fig_manager().window.showMaximized()
-    plt.draw()
-    plt.pause(1e-17)
+    draw()
 
 def date_hist(ax, df, old_thresh=np.datetime64(datetime(2019,3,1))):
     dts = [str(dt) if str(dt)=='NaT'
@@ -143,7 +164,7 @@ def author_concentration(ax1, df):
     for k,src in enumerate(np.unique(df.source)):
         # calculate
         d = df[df.source==src]
-        authors = np.array(sorted(list(set([str(a) for a in d.author]))))
+        authors = np.array(sorted(list(set([str(a) for a in d.author[d.author!='']]))))
         arts_per_aut = np.array([np.sum(d.author==a) for a in authors])
         ids = sorted(range(len(arts_per_aut)),
                      key=lambda i: arts_per_aut[i], reverse=True)
@@ -157,7 +178,7 @@ def author_concentration(ax1, df):
         ax1.set_title('Authors', fontsize=14)
         ax1.set_xlabel('K', fontsize=12)
         ax1.set_ylabel(
-            'Number of articles by most active K authors\n'+
+            'Number of articles by most active K authors [%]\n'+
             '(not reaching 100% due to unknown authors)', fontsize=12)
     ax1.set_xlim((0,n))
     ax1.set_ylim((0,100))
@@ -170,7 +191,7 @@ def top_authors(ax, df, n=5):
     for k,src in enumerate(sources):
         # calculate
         d = df[df.source==src]
-        authors = np.array(sorted(list(set([str(a) for a in d.author]))))
+        authors = np.array(sorted(list(set([str(a) for a in d.author[d.author!='']]))))
         arts_per_aut = np.array([np.sum(d.author==a) for a in authors])
         ids = sorted(range(len(arts_per_aut)),
                      key=lambda i: arts_per_aut[i], reverse=True)
@@ -201,8 +222,8 @@ def validity_tests(df):
     df = df[np.logical_not(df['blocked'])]
     n = {src: np.sum(df['source'] == src) for src in sources}
     # get anomalies
-    bad_types = {src: verify_types(df[df['source']==src],
-                                   {'date':datetime,'blocked':np.bool_})
+    bad_types = {src: verify_valid(df[df['source']==src],
+                                      {'date':datetime,'blocked':np.bool_})
                  for src in sources}
     bad_lengths = {src: check_lengths(df[df['source']==src]) for src in sources}
     # plot anomalies
@@ -227,16 +248,23 @@ def validity_tests(df):
                 title=f'[{src:s}] Suspicious string-field lengths',
                 ylab='Having invalid length [%]', ylim=(0, 100))
     # draw
-    plt.get_current_fig_manager().window.showMaximized()
-    plt.draw()
-    plt.pause(1e-17)
+    draw()
 
-def verify_types(df, types=(), default_type=str):
-    bad_type = {}
+def verify_valid(df, types=()):
+    '''
+    Count invalid entries - either empty (default) or invalid type.
+    :param df: data frame
+    :param types: dictionary of columns and their desired types
+    :return: count of invalid entries per column (as dictionary)
+    '''
+    bad = {}
     for col in df.columns:
-        tp = types[col] if col in types else default_type
-        bad_type[col] = np.sum([not isinstance(x, tp) for x in df[col]])
-    return bad_type
+        if col in types:
+            bad[col] = np.sum([not isinstance(x, types[col])
+                                    for x in df[col]])
+        else:
+            bad[col] = np.sum([not x for x in df[col]])
+    return bad
 
 def check_lengths(df, lengths={'section': (2, 20), 'title': (10, 6 * 30),
                                'subtitle': (10, 6 * 70), 'date': (6, 12),
@@ -253,19 +281,58 @@ def check_haaretz_blocked_text(df):
     assert (all(src == 'haaretz' for src in df['source']))
     return np.sum([s.endswith('...') for s in df['text']])
 
+def lengths_analysis(df):
+    f, axs = plt.subplots(3, 3)
+    # remove blocked haaretz texts before analysis
+    df = df[np.logical_not(df['blocked'])]
+    # count units
+    df['words_per_text'] = count_words(df.text)
+    df['words_per_title'] = count_words(df.title)
+    df['words_per_subtitle'] = count_words(df.subtitle)
+    df['characters_per_text'] = [len(s) for s in df.text]
+    df['sentences_per_text'] = count_sentences(df.text)
+    df['paragraphs_per_text'] = count_paragraphs(df.text)
+    df['characters_per_title'] = [len(s) for s in df.title]
+    df['unique_words_per_100_words'] =\
+        [100*len(np.unique(list(filter(None,re.split(' |\t|\n\r|\n',s))))) /
+         len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
+         for s in df.text]
+    df['characters_per_word'] =\
+        [len(s)/len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
+         for s in df.text]
+    # plot
+    columns = ('words_per_text', 'words_per_subtitle', 'words_per_title',
+               'characters_per_text', 'sentences_per_text', 'paragraphs_per_text',
+               'characters_per_title', 'unique_words_per_100_words',
+               'characters_per_word')
+    for i,col in enumerate(columns):
+        ax = axs[int(i/3),i%3]
+        bp = df.boxplot(column=col, by=['source'], ax=ax,
+                        return_type='both', patch_artist=True)
+        for box, color in zip(bp[0][1]['boxes'], ('blue','red','green')):
+            box.set_facecolor(color)
+        ax.set_xlabel('')#'Source', fontsize=12)
+        ax.set_ylabel(col.replace('_',' ').capitalize(), fontsize=12)
+        if i==0:
+            ax.set_title('TOKENS COUNT', fontsize=14)
+        else:
+            ax.set_title('')
+    # TODO same boxplots for subset with certain sections, and by=[source,section]?
+    # specifically: news, economics, sport (where money->economics)
+    # draw
+    draw()
 
-# TODO counters:
-# boxplot(source, n_words per title)
-# boxplot(source, n_words per subtitle)
-# boxplot(source, n_words per text)
-# boxplot(source, n_chars per title)
-# boxplot(source, n_chars per subtitle)
-# boxplot(source, n_chars per text)
-# boxplot(source, n_chars per text_word)
-# boxplot(source, 100*n_unique_chars/n_chars per text)
+
+# TODO
+# Add to validity tests:
+# How many tokens without Hebrew chars
+# How many 1-hebrew-char words
 
 # per section basic analysis
-# TODO same as per source? maybe generalize functions to receive sources/sections as input.
+# TODO same as per source?
+# maybe generalize functions to receive sources/sections as input.
+
+# TODO check anomalies in data as seen in all the plots
 
 ############## MAIN ##############
 
@@ -273,5 +340,6 @@ if __name__ == "__main__":
     df = load_data(r'D:\Code\Python\News\Scrapper\articles')
     data_description(df.copy())
     validity_tests(df.copy())
+    lengths_analysis(df.copy())
     plt.tight_layout()
     plt.show()
