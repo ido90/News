@@ -16,92 +16,7 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import Scrapper.ScrapperTools as st
 
-def load_data(path,
-              sheets=('ynet', 'mako', 'haaretz'),
-              filter_str=('source','title','text'),
-              force_string=('title','subtitle','text','url','link_title',
-                            'author','section','source'),
-              verbose=1):
-    df = st.load_data_frame(path, sheets=sheets, verbose=verbose)
-    for h in filter_str:
-        df = df[[(isinstance(t, str) and len(t)>0) for t in df[h].values]]
-    pd.options.mode.chained_assignment = None
-    for col in force_string:
-        df.loc[[not isinstance(s,str) for s in df[col]], col] = ''
-    df['blocked'] = [src=='haaretz' and txt.endswith('...')
-                     for src,txt in zip(df['source'], df['text'])]
-    return df
-
-############## GENERAL TOOLS ##############
-
-DEF_COLORS = ('blue','red','green','purple','orange','grey','pink')
-
-def dist(x, quantiles=(0,10,50,90,100), do_round=False):
-    if not len(x):
-        return [None for _ in range(2+len(quantiles))]
-    s = [len(x), np.mean(x)] + list(np.percentile(x,quantiles))
-    return [int(z+np.sign(z)*0.5) for z in s] if do_round else s
-
-def barplot(ax, x, y, bottom=None, plot_bottom=True,
-            title=None, xlab=None, ylab=None, xlim=None, ylim=None, label=None,
-            vertical_xlabs=False, colors=DEF_COLORS, bcolors=DEF_COLORS):
-    xticks = None
-    if any((isinstance(xx,str) for xx in x)):
-        xnames = x
-        x = tuple(range(len(x)))
-        xticks = x
-    if bottom is not None and plot_bottom:
-        ax.bar(x, bottom,
-               color=bcolors[:len(x)] if isinstance(bcolors,tuple) else bcolors)
-    ax.bar(x, y, bottom=bottom, label=label,
-           color=colors[:len(x)] if isinstance(colors,tuple) else colors)
-    if title: ax.set_title(title, fontsize=14)
-    if xlab: ax.set_xlabel(xlab, fontsize=12)
-    if ylab: ax.set_ylabel(ylab, fontsize=12)
-    if xlim: ax.set_xlim(xlim[0],xlim[1])
-    if ylim: ax.set_ylim(ylim[0],ylim[1])
-    if xticks:
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(xnames, fontsize=10)
-        if vertical_xlabs:
-            for tick in ax.get_xticklabels():
-                tick.set_rotation(90)
-
-def bar_per_source(ax, df, fun, ylab, title,
-                   colors='black', bcolors=DEF_COLORS):
-    sources = np.unique(df.source)
-    barplot(ax, sources,
-            [fun(df[np.logical_and(df.source==src,df.blocked)]) for src in sources],
-            bottom=
-            [fun(df[np.logical_and(df.source==src,np.logical_not(df.blocked))])
-             for src in sources],
-            ylab=ylab, title=title, colors=colors, bcolors=bcolors)
-
-def clean_figure(ax):
-    ax.set_xticks(())
-    ax.set_yticks(())
-    ax.set_xticklabels(())
-    ax.set_yticklabels(())
-
-def count(txt, sep):
-    if isinstance(txt,str):
-        return len(list(filter(None,re.split(sep,txt))))
-    else:
-        return [len(list(filter(None,re.split(sep,s)))) for s in txt]
-def count_words(txt, sep=' |\t|\n\r|\n'):
-    return count(txt,sep)
-def count_sentences(txt, sep='\. |\.\n|\.\r'):
-    return count(txt,sep)
-def count_paragraphs(txt, sep='\n|\n\r'):
-    return count(txt,sep)
-
-def draw():
-    plt.get_current_fig_manager().window.showMaximized()
-    plt.draw()
-    plt.pause(1e-17)
-    plt.tight_layout()
-
-############## ANALYSIS ##############
+############## MAIN FUNCTIONS ##############
 
 def data_description(df):
     sources = np.unique(df['source'])
@@ -115,7 +30,7 @@ def data_description(df):
                    fun=lambda d: sum(len(l.split()) for t in d['text'].values
                                      for l in t.split('\n')) / 1e3,
                    title='BASIC DATA DESCRIPTION\nWords per Source')
-    # remove blocked haaretz texts before analysis
+    # remove blocked haaretz texts before next analysis
     df = df[np.logical_not(df['blocked'])]
     # sections per source
     articles_per_section =\
@@ -141,6 +56,114 @@ def data_description(df):
     top_authors(axs[1,2], df)
     # draw
     draw()
+
+def validity_tests(df):
+    sources = np.unique(df['source'])
+    blocked_contents = (1-check_haaretz_blocked_text(df[df['source'] == 'haaretz'])\
+                       / np.sum(df['source']=='haaretz')) * 100
+    df = df[np.logical_not(df['blocked'])]
+    n = {src: np.sum(df['source'] == src) for src in sources}
+    # get anomalies
+    bad_types = {src: verify_valid(df[df['source']==src],
+                                      {'date':datetime,'blocked':np.bool_})
+                 for src in sources}
+    bad_lengths = {src: check_lengths(df[df['source']==src]) for src in sources}
+    bad_tokens = {src: verify_hebrew_words(df[df['source']==src]) for src in sources}
+    # plot anomalies
+    f, axs = plt.subplots(3, len(sources))
+    for i, src in enumerate(sources):
+        tit = ('DATA SANITY TESTS\n' if i==int(len(sources)/2) else '\n') +\
+              f'[{src:s}] Invalid field types' +\
+              (f'\n(out of {blocked_contents:.0f}% unblocked articles)'
+               if src=='haaretz' else '\n')
+        barplot(axs[0, i], bad_types[src].keys(),
+                100 * np.array(tuple(bad_types[src].values())) / n[src],
+                vertical_xlabs=True, title=tit,
+                ylab='Having invalid type [%]', ylim=(0, 100))
+    sp = inspect.getfullargspec(check_lengths)
+    limits = list(itertools.chain.from_iterable(sp[3][0].values()))
+    for i, src in enumerate(sources):
+        barplot(axs[1, i],
+                [a+f'\n({b:.0f} chars)' for a,b in
+                 zip(bad_lengths[src].keys(),limits)],
+                100 * np.array(tuple(bad_lengths[src].values())) / n[src],
+                vertical_xlabs=True,
+                title=f'[{src:s}] Suspicious string-field lengths',
+                ylab='Having invalid length [%]', ylim=(0, 100))
+    barplot(axs[2,0], sources, [100*(1-bad_tokens[src][0]) for src in sources],
+            xlab='Source', ylab='Words without numbers\nor Hebrew letters [%]')
+    barplot(axs[2,1], sources, [100*(1-bad_tokens[src][1]) for src in sources],
+            xlab='Source', ylab='Words of length <=1 [%]')
+    for i in range(2,len(sources)):
+        clean_figure(axs[2,i])
+    # draw
+    draw()
+
+def lengths_analysis(df, by=None):
+    f, axs = plt.subplots(3, 3)
+    # remove blocked haaretz texts before analysis
+    df = df[np.logical_not(df['blocked'])]
+    # count units
+    df['words_per_text'] = count_words(df.text)
+    df['words_per_title'] = count_words(df.title)
+    df['words_per_subtitle'] = count_words(df.subtitle)
+    df['characters_per_text'] = [len(s) for s in df.text]
+    df['sentences_per_text'] = count_sentences(df.text)
+    df['paragraphs_per_text'] = count_paragraphs(df.text)
+    df['characters_per_title'] = [len(s) for s in df.title]
+    df['unique_words_per_100_words'] =\
+        [100*len(np.unique(list(filter(None,re.split(' |\t|\n\r|\n',s))))) /
+         len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
+         for s in df.text]
+    df['characters_per_word'] =\
+        [len(s)/len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
+         for s in df.text]
+    # plot
+    columns = ('words_per_text', 'words_per_subtitle', 'words_per_title',
+               'characters_per_text', 'sentences_per_text', 'paragraphs_per_text',
+               'characters_per_title', 'unique_words_per_100_words',
+               'characters_per_word')
+    for i,col in enumerate(columns):
+        ax = axs[int(i/3),i%3]
+        bp = df.boxplot(ax=ax, column=col, by=['source']+([by] if by else []),
+                        return_type='both', patch_artist=True)
+        colors = np.repeat(('blue','red','green'), int(len(bp[0][1]['boxes'])/3))
+        for box, color in zip(bp[0][1]['boxes'], colors):
+            box.set_facecolor(color)
+        ax.set_xlabel('')#'Source', fontsize=12)
+        ax.set_ylabel(col.replace('_',' ').capitalize(), fontsize=12)
+        if by:
+            ax.set_xticklabels(
+                [bidi.get_display(
+                    t._text.replace('(', '').replace(')', '').replace(', ', '\n') )
+                    for t in ax.get_xticklabels()],
+                rotation=90)
+        if i==0:
+            ax.set_title('TOKENS COUNT', fontsize=14)
+        else:
+            ax.set_title('')
+    # draw
+    draw()
+
+############## LOAD DATA ##############
+
+def load_data(path,
+              sheets=('ynet', 'mako', 'haaretz'),
+              filter_str=('source','title','text'),
+              force_string=('title','subtitle','text','url','link_title',
+                            'author','section','source'),
+              verbose=1):
+    df = st.load_data_frame(path, sheets=sheets, verbose=verbose)
+    for h in filter_str:
+        df = df[[(isinstance(t, str) and len(t)>0) for t in df[h].values]]
+    pd.options.mode.chained_assignment = None
+    for col in force_string:
+        df.loc[[not isinstance(s,str) for s in df[col]], col] = ''
+    df['blocked'] = [src=='haaretz' and txt.endswith('...')
+                     for src,txt in zip(df['source'], df['text'])]
+    return df
+
+############## DEDICATED FUNCTIONS ##############
 
 def date_hist(ax, df, old_thresh=np.datetime64(datetime(2019,3,1))):
     dts = [str(dt) if str(dt)=='NaT'
@@ -215,41 +238,6 @@ def top_authors(ax, df, n=5):
     ax.set_xticks(np.arange(len(sources)) + n*width/2)
     ax.set_xticklabels(sources)
 
-def validity_tests(df):
-    sources = np.unique(df['source'])
-    blocked_contents = (1-check_haaretz_blocked_text(df[df['source'] == 'haaretz'])\
-                       / np.sum(df['source']=='haaretz')) * 100
-    df = df[np.logical_not(df['blocked'])]
-    n = {src: np.sum(df['source'] == src) for src in sources}
-    # get anomalies
-    bad_types = {src: verify_valid(df[df['source']==src],
-                                      {'date':datetime,'blocked':np.bool_})
-                 for src in sources}
-    bad_lengths = {src: check_lengths(df[df['source']==src]) for src in sources}
-    # plot anomalies
-    f, axs = plt.subplots(2, len(sources))
-    for i, src in enumerate(sources):
-        tit = ('DATA VALIDITY TESTS\n' if i==int(len(sources)/2) else '\n') +\
-              f'[{src:s}] Invalid field types' +\
-              (f'\n(out of {blocked_contents:.0f}% unblocked articles)'
-               if src=='haaretz' else '\n')
-        barplot(axs[0, i], bad_types[src].keys(),
-                100 * np.array(tuple(bad_types[src].values())) / n[src],
-                vertical_xlabs=True, title=tit,
-                ylab='Having invalid type [%]', ylim=(0, 100))
-    sp = inspect.getfullargspec(check_lengths)
-    limits = list(itertools.chain.from_iterable(sp[3][0].values()))
-    for i, src in enumerate(sources):
-        barplot(axs[1, i],
-                [a+f'\n({b:.0f} chars)' for a,b in
-                 zip(bad_lengths[src].keys(),limits)],
-                100 * np.array(tuple(bad_lengths[src].values())) / n[src],
-                vertical_xlabs=True,
-                title=f'[{src:s}] Suspicious string-field lengths',
-                ylab='Having invalid length [%]', ylim=(0, 100))
-    # draw
-    draw()
-
 def verify_valid(df, types=()):
     '''
     Count invalid entries - either empty (default) or invalid type.
@@ -277,62 +265,91 @@ def check_lengths(df, lengths={'section': (2, 20), 'title': (10, 6 * 30),
             np.sum([isinstance(s,str) and len(s)>lengths[l][1] for s in df[l]])
     return exceptional_length
 
+def verify_hebrew_words(df):
+    heb = np.mean(
+        [any('א'<=c<='ת' or '1'<=c<='9' for c in w)
+         for w in list(
+            filter(None, re.split(' | - |\t|\n\r|\n', ' '.join(df.text) )))
+         ])
+    word = np.mean(
+         [len(w)>=2
+          for w in list(
+             filter(None, re.split(' | - |\t|\n\r|\n', ' '.join(df.text) )))
+          ])
+    return (word, heb)
+
 def check_haaretz_blocked_text(df):
     assert (all(src == 'haaretz' for src in df['source']))
     return np.sum([s.endswith('...') for s in df['text']])
 
-def lengths_analysis(df):
-    f, axs = plt.subplots(3, 3)
-    # remove blocked haaretz texts before analysis
-    df = df[np.logical_not(df['blocked'])]
-    # count units
-    df['words_per_text'] = count_words(df.text)
-    df['words_per_title'] = count_words(df.title)
-    df['words_per_subtitle'] = count_words(df.subtitle)
-    df['characters_per_text'] = [len(s) for s in df.text]
-    df['sentences_per_text'] = count_sentences(df.text)
-    df['paragraphs_per_text'] = count_paragraphs(df.text)
-    df['characters_per_title'] = [len(s) for s in df.title]
-    df['unique_words_per_100_words'] =\
-        [100*len(np.unique(list(filter(None,re.split(' |\t|\n\r|\n',s))))) /
-         len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
-         for s in df.text]
-    df['characters_per_word'] =\
-        [len(s)/len(list(filter(None,re.split(' |\t|\n\r|\n',s))))
-         for s in df.text]
-    # plot
-    columns = ('words_per_text', 'words_per_subtitle', 'words_per_title',
-               'characters_per_text', 'sentences_per_text', 'paragraphs_per_text',
-               'characters_per_title', 'unique_words_per_100_words',
-               'characters_per_word')
-    for i,col in enumerate(columns):
-        ax = axs[int(i/3),i%3]
-        bp = df.boxplot(column=col, by=['source'], ax=ax,
-                        return_type='both', patch_artist=True)
-        for box, color in zip(bp[0][1]['boxes'], ('blue','red','green')):
-            box.set_facecolor(color)
-        ax.set_xlabel('')#'Source', fontsize=12)
-        ax.set_ylabel(col.replace('_',' ').capitalize(), fontsize=12)
-        if i==0:
-            ax.set_title('TOKENS COUNT', fontsize=14)
-        else:
-            ax.set_title('')
-    # TODO same boxplots for subset with certain sections, and by=[source,section]?
-    # specifically: news, economics, sport (where money->economics)
-    # draw
-    draw()
+############## GENERAL TOOLS ##############
 
+DEF_COLORS = ('blue','red','green','purple','orange','grey','pink')
 
-# TODO
-# Add to validity tests:
-# How many tokens without Hebrew chars
-# How many 1-hebrew-char words
+def dist(x, quantiles=(0,10,50,90,100), do_round=False):
+    if not len(x):
+        return [None for _ in range(2+len(quantiles))]
+    s = [len(x), np.mean(x)] + list(np.percentile(x,quantiles))
+    return [int(z+np.sign(z)*0.5) for z in s] if do_round else s
 
-# per section basic analysis
-# TODO same as per source?
-# maybe generalize functions to receive sources/sections as input.
+def barplot(ax, x, y, bottom=None, plot_bottom=True,
+            title=None, xlab=None, ylab=None, xlim=None, ylim=None, label=None,
+            vertical_xlabs=False, colors=DEF_COLORS, bcolors=DEF_COLORS):
+    xticks = None
+    if any((isinstance(xx,str) for xx in x)):
+        xnames = x
+        x = tuple(range(len(x)))
+        xticks = x
+    if bottom is not None and plot_bottom:
+        ax.bar(x, bottom,
+               color=bcolors[:len(x)] if isinstance(bcolors,tuple) else bcolors)
+    ax.bar(x, y, bottom=bottom, label=label,
+           color=colors[:len(x)] if isinstance(colors,tuple) else colors)
+    if title: ax.set_title(title, fontsize=14)
+    if xlab: ax.set_xlabel(xlab, fontsize=12)
+    if ylab: ax.set_ylabel(ylab, fontsize=12)
+    if xlim: ax.set_xlim(xlim[0],xlim[1])
+    if ylim: ax.set_ylim(ylim[0],ylim[1])
+    if xticks:
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xnames, fontsize=10)
+        if vertical_xlabs:
+            for tick in ax.get_xticklabels():
+                tick.set_rotation(90)
 
-# TODO check anomalies in data as seen in all the plots
+def bar_per_source(ax, df, fun, ylab, title,
+                   colors='black', bcolors=DEF_COLORS):
+    sources = np.unique(df.source)
+    barplot(ax, sources,
+            [fun(df[np.logical_and(df.source==src,df.blocked)]) for src in sources],
+            bottom=
+            [fun(df[np.logical_and(df.source==src,np.logical_not(df.blocked))])
+             for src in sources],
+            ylab=ylab, title=title, colors=colors, bcolors=bcolors)
+
+def clean_figure(ax):
+    ax.set_xticks(())
+    ax.set_yticks(())
+    ax.set_xticklabels(())
+    ax.set_yticklabels(())
+
+def count(txt, sep):
+    if isinstance(txt,str):
+        return len(list(filter(None,re.split(sep,txt))))
+    else:
+        return [len(list(filter(None,re.split(sep,s)))) for s in txt]
+def count_words(txt, sep=' | - |\t|\n\r|\n'):
+    return count(txt,sep)
+def count_sentences(txt, sep='\. |\.\n|\.\r'):
+    return count(txt,sep)
+def count_paragraphs(txt, sep='\n|\n\r'):
+    return count(txt,sep)
+
+def draw():
+    plt.get_current_fig_manager().window.showMaximized()
+    plt.draw()
+    plt.pause(1e-17)
+    plt.tight_layout()
 
 ############## MAIN ##############
 
@@ -340,6 +357,9 @@ if __name__ == "__main__":
     df = load_data(r'D:\Code\Python\News\Scrapper\articles')
     data_description(df.copy())
     validity_tests(df.copy())
-    lengths_analysis(df.copy())
-    plt.tight_layout()
+    lengths_analysis(
+        df[df.section.isin(('חדשות','כלכלה','כסף','ספורט','אוכל'))].copy(),
+        by='section')
     plt.show()
+
+# TODO check and understand anomalies in data as seen in all the plots
