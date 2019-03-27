@@ -15,7 +15,8 @@ import Scrapper.ScrapperTools as st
 
 '''
 Status: HTMLs are very structured with convenient and distinctive labels,
-which makes life easier. ~300 articles were successfully scrapped.
+which makes life easier. However, some of the articles' content was blocked by the site.
+~100 articles were successfully scrapped (and ~200 more with only one paragraph).
 '''
 
 SECTIONS = (['https://www.haaretz.co.il/news',
