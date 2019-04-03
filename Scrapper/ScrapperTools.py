@@ -94,6 +94,7 @@ def get_articles_data_from_sections(
             update_freq=update_freq, verbose=verbose
         ) for sec in sections
     ])
+    df.drop_duplicates('url', inplace=True)
     if save_to:
         save_data_frame(df, save_to, sheet_name)
     return df

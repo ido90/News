@@ -292,6 +292,80 @@ def dist(x, quantiles=(0,10,50,90,100), do_round=False):
     s = [len(x), np.mean(x)] + list(np.percentile(x,quantiles))
     return [int(z+np.sign(z)*0.5) for z in s] if do_round else s
 
+def table(l, sort=0):
+    try:
+        tab = tuple((g[0], len(list(g[1])))
+                    for g in itertools.groupby(sorted(l)))
+    except:
+        tab = tuple((g[0], len(list(g[1])))
+                    for g in itertools.groupby(l))
+    if sort:
+        tab = sorted(tab, key = lambda x: np.sign(sort)*x[1])
+    return tab
+
+def info(df, verbose=1):
+    assert(isinstance(df,pd.DataFrame)),\
+        f'Bad type (not a DataFrame): {type(df):s}'
+    print(f'\n\nData-Frame information:')
+    # data frame info
+    print(f'Dimensions: \t{df.shape[0]} X {df.shape[1]}')
+    print('Columns:', end='\n\t')
+    for i,col in enumerate(df.columns):
+        print(col, end =
+        '\n\t' if i+1==df.shape[1] or (i+1)%3==0 else '  |  ')
+    print('')
+    # columns stats
+    if verbose >= 1:
+        for col in df.columns:
+            print(f'{col:s}:\n\tTypes: \t', end='')
+            types = table([str(type(x))[8:-2] for x in df[col]], -1)
+            for t in types:
+                print(f'{t[0]:s} ({100*t[1]/len(df):.0f}%), ', end='')
+            print('')
+            print(f'\tUnique values: \t{len(np.unique(df[col])):d}')
+            print('\tFrequent values: \t', end='')
+            tab = table(df[col],-1)
+            for i,t in enumerate(tab[:4]):
+                try:
+                    if len(t[0])>30:
+                        tab[i] = (str(t[0][:30])+'...', tab[i][1])
+                except:
+                    pass
+            print(*[f'{t[0]}'+f' ({t[1]:d}),' for t in tab[:4]])
+            print('\tFrequent frequencies: \t', end='')
+            tab = table([t[1] for t in tab], -1)
+            print(*[f'{t[0]:d}'+f' ({t[1]:d}),' for t in tab[:4]])
+            qs = (0, 10, 50, 90, 100)
+            try:
+                d = dist(df[col])
+                print(f'\tAverage: \t{d[1]}')
+                print('\tQuantiles: \t', end='')
+                print(*[f'{q:.0f}%: {v}' for q, v in zip(qs, d[2:])],
+                      sep=',   ')
+            except:
+                try:
+                    d = dist([len(s) for s in df[col]])
+                    print(f'\tAverage length: \t{d[1]}')
+                    print('\tQuantiles: \t', end='')
+                    print(*[f'{q:.0f}%: {v:.0f}'
+                            for q, v in zip(qs, d[2:])],
+                          sep=',   ')
+                except:
+                    pass
+    # sample of contents
+    if verbose >= 2:
+        if (len(df)<20):
+            print(df)
+        else:
+            print('\nHead:')
+            print(df.head(5))
+            print('\nMid:')
+            print(df[int(len(df)/2)-2:int(len(df)/2)+2])
+            print('\nTail:')
+            print(df.tail(5))
+        print('')
+    # add optional plots if verbose >= 3?
+
 def barplot(ax, x, y, bottom=None, plot_bottom=True,
             title=None, xlab=None, ylab=None, xlim=None, ylim=None, label=None,
             vertical_xlabs=False, colors=DEF_COLORS, bcolors=DEF_COLORS):
@@ -354,7 +428,8 @@ def draw():
 ############## MAIN ##############
 
 if __name__ == "__main__":
-    df = load_data(r'D:\Code\Python\News\Scrapper\articles')
+    df = load_data(r'..\Data\articles')
+    info(df)
     data_description(df.copy())
     validity_tests(df.copy())
     lengths_analysis(
@@ -362,4 +437,4 @@ if __name__ == "__main__":
         by='section')
     plt.show()
 
-# TODO check and understand anomalies in data as seen in all the plots
+# TODO move infra to general module

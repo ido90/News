@@ -1,0 +1,27 @@
+Invalid link titles:
+Link titles (the texts associated with the links of the articles) were not scrapped in Haaretz due to complexity and low importance.
+
+Invalid authors:
+It looks like there're several possible HTML structures for the author label in Haaretz and Mako, whereas only one was parsed.
+In addition, TheMarker authors within Haaretz were not scrapped at all due to slight complexity and lack of patience.
+
+Short text length:
+Most are valid (short food or religion stuff).
+Few articles are administration articles ("did you find a mistake? please write to us...").
+Few articles were mis-parsed due to reasons like unusual HTML labels.
+
+Long author name:
+Looks like just multiple authors.
+
+Short titles:
+Most are valid (e.g. a name of a restaurant).
+
+Non-Hebrew/number/single-character words:
+Mostly just English or hyphen ("-") or something else.
+Dumbly-implemented sanity check, when I come to think about it.
+Although non-Hebrew may be an interesting feature in classification later on.
+
+Repetitions:
+np.unique should have been applied on URLs per source rather than per section.
+Few articles were shared by different sections, hence were duplicated.
+This has been fixed.

@@ -155,5 +155,5 @@ if __name__=='__main__':
     articles = get_all_articles(urls, sections, demo=demo)
     print("\nScrapping articles...")
     df = get_articles_data(articles, demo=demo,
-                           save_to=r'd:\code\python\news\scrapper\articles')
+                           save_to=r'..\Data\articles')
     print('Done.')
