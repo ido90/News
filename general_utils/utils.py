@@ -33,11 +33,11 @@ def table(l, sort=0):
     :return: tuple of 2D-tuples (value, number of occurences in l).
     '''
     try:
-		# if it can be sorted, it should (otherwise groupby may work unexpectedly).
+        # if it can be sorted, it should (otherwise groupby may work unexpectedly).
         tab = tuple((g[0], len(list(g[1])))
                     for g in itertools.groupby(sorted(l)))
     except:
-		# if it can't be sorted (e.g. datetime), try groupby anyway.
+        # if it can't be sorted (e.g. datetime), try groupby anyway.
         tab = tuple((g[0], len(list(g[1])))
                     for g in itertools.groupby(l))
     if sort:

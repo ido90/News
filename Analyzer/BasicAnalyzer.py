@@ -1,4 +1,3 @@
-import general_utils.utils as utils
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +14,7 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
+import general_utils.utils as utils
 import Scrapper.ScrapperTools as st
 
 ############## MAIN FUNCTIONS ##############
