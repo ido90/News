@@ -1,3 +1,4 @@
+from utils import utils
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,7 +39,7 @@ def data_description(df):
          for src in sources
          for sec in np.unique(df[df.source==src].section)]
     axs[0,2].pie([df[df.source==src].shape[0] for src in sources],
-                 labels=sources, colors=DEF_COLORS[:3], startangle=90,
+                 labels=sources, colors=utils.DEF_COLORS[:3], startangle=90,
                  frame=True, counterclock=False)
     patches,_ = axs[0,2].pie(articles_per_section,
                   radius=0.75, startangle=90, counterclock=False)
@@ -76,26 +77,26 @@ def validity_tests(df):
               f'[{src:s}] Invalid field types' +\
               (f'\n(out of {blocked_contents:.0f}% unblocked articles)'
                if src=='haaretz' else '\n')
-        barplot(axs[0, i], bad_types[src].keys(),
-                100 * np.array(tuple(bad_types[src].values())) / n[src],
-                vertical_xlabs=True, title=tit,
-                ylab='Having invalid type [%]', ylim=(0, 100))
+        utils.barplot(axs[0, i], bad_types[src].keys(),
+                      100 * np.array(tuple(bad_types[src].values())) / n[src],
+                      vertical_xlabs=True, title=tit,
+                      ylab='Having invalid type [%]', ylim=(0, 100))
     sp = inspect.getfullargspec(check_lengths)
     limits = list(itertools.chain.from_iterable(sp[3][0].values()))
     for i, src in enumerate(sources):
-        barplot(axs[1, i],
-                [a+f'\n({b:.0f} chars)' for a,b in
-                 zip(bad_lengths[src].keys(),limits)],
-                100 * np.array(tuple(bad_lengths[src].values())) / n[src],
-                vertical_xlabs=True,
-                title=f'[{src:s}] Suspicious string-field lengths',
-                ylab='Having invalid length [%]', ylim=(0, 100))
-    barplot(axs[2,0], sources, [100*(1-bad_tokens[src][0]) for src in sources],
-            xlab='Source', ylab='Words without numbers\nor Hebrew letters [%]')
-    barplot(axs[2,1], sources, [100*(1-bad_tokens[src][1]) for src in sources],
-            xlab='Source', ylab='Words of length <=1 [%]')
+        utils.barplot(axs[1, i],
+                      [a+f'\n({b:.0f} chars)' for a,b in
+                       zip(bad_lengths[src].keys(),limits)],
+                      100 * np.array(tuple(bad_lengths[src].values())) / n[src],
+                      vertical_xlabs=True,
+                      title=f'[{src:s}] Suspicious string-field lengths',
+                      ylab='Having invalid length [%]', ylim=(0, 100))
+    utils.barplot(axs[2,0], sources, [100*(1-bad_tokens[src][0]) for src in sources],
+                  xlab='Source', ylab='Words without numbers\nor Hebrew letters [%]')
+    utils.barplot(axs[2,1], sources, [100*(1-bad_tokens[src][1]) for src in sources],
+                  xlab='Source', ylab='Words of length <=1 [%]')
     for i in range(2,len(sources)):
-        clean_figure(axs[2,i])
+        utils.clean_figure(axs[2,i])
     # draw
     draw()
 
@@ -176,9 +177,9 @@ def date_hist(ax, df, old_thresh=np.datetime64(datetime(2019,3,1))):
                   for src in sources}
     bottom = np.array([0 for _ in dts_vals])
     for i,src in enumerate(sources):
-        barplot(ax, dts_vals, date_count[src], bottom=bottom, title='Dates',
-                ylab='Articles', vertical_xlabs=True, label=src,
-                colors=('b','r','g')[i], plot_bottom=False)
+        utils.barplot(ax, dts_vals, date_count[src], bottom=bottom, title='Dates',
+                      ylab='Articles', vertical_xlabs=True, label=src,
+                      colors=('b','r','g')[i], plot_bottom=False)
         bottom += date_count[src]
     ax.legend(loc='upper left')
 
@@ -284,140 +285,24 @@ def check_haaretz_blocked_text(df):
 
 ############## GENERAL TOOLS ##############
 
-DEF_COLORS = ('blue','red','green','purple','orange','grey','pink')
-
-def dist(x, quantiles=(0,10,50,90,100), do_round=False):
-    if not len(x):
-        return [None for _ in range(2+len(quantiles))]
-    s = [len(x), np.mean(x)] + list(np.percentile(x,quantiles))
-    return [int(z+np.sign(z)*0.5) for z in s] if do_round else s
-
-def table(l, sort=0):
-    try:
-        tab = tuple((g[0], len(list(g[1])))
-                    for g in itertools.groupby(sorted(l)))
-    except:
-        tab = tuple((g[0], len(list(g[1])))
-                    for g in itertools.groupby(l))
-    if sort:
-        tab = sorted(tab, key = lambda x: np.sign(sort)*x[1])
-    return tab
-
-def info(df, verbose=1):
-    assert(isinstance(df,pd.DataFrame)),\
-        f'Bad type (not a DataFrame): {type(df):s}'
-    print(f'\n\nData-Frame information:')
-    # data frame info
-    print(f'Dimensions: \t{df.shape[0]} X {df.shape[1]}')
-    print('Columns:', end='\n\t')
-    for i,col in enumerate(df.columns):
-        print(col, end =
-        '\n\t' if i+1==df.shape[1] or (i+1)%3==0 else '  |  ')
-    print('')
-    # columns stats
-    if verbose >= 1:
-        for col in df.columns:
-            print(f'{col:s}:\n\tTypes: \t', end='')
-            types = table([str(type(x))[8:-2] for x in df[col]], -1)
-            for t in types:
-                print(f'{t[0]:s} ({100*t[1]/len(df):.0f}%), ', end='')
-            print('')
-            print(f'\tUnique values: \t{len(np.unique(df[col])):d}')
-            print('\tFrequent values: \t', end='')
-            tab = table(df[col],-1)
-            for i,t in enumerate(tab[:4]):
-                try:
-                    if len(t[0])>30:
-                        tab[i] = (str(t[0][:30])+'...', tab[i][1])
-                except:
-                    pass
-            print(*[f'{t[0]}'+f' ({t[1]:d}),' for t in tab[:4]])
-            print('\tFrequent frequencies: \t', end='')
-            tab = table([t[1] for t in tab], -1)
-            print(*[f'{t[0]:d}'+f' ({t[1]:d}),' for t in tab[:4]])
-            qs = (0, 10, 50, 90, 100)
-            try:
-                d = dist(df[col])
-                print(f'\tAverage: \t{d[1]}')
-                print('\tQuantiles: \t', end='')
-                print(*[f'{q:.0f}%: {v}' for q, v in zip(qs, d[2:])],
-                      sep=',   ')
-            except:
-                try:
-                    d = dist([len(s) for s in df[col]])
-                    print(f'\tAverage length: \t{d[1]}')
-                    print('\tQuantiles: \t', end='')
-                    print(*[f'{q:.0f}%: {v:.0f}'
-                            for q, v in zip(qs, d[2:])],
-                          sep=',   ')
-                except:
-                    pass
-    # sample of contents
-    if verbose >= 2:
-        if (len(df)<20):
-            print(df)
-        else:
-            print('\nHead:')
-            print(df.head(5))
-            print('\nMid:')
-            print(df[int(len(df)/2)-2:int(len(df)/2)+2])
-            print('\nTail:')
-            print(df.tail(5))
-        print('')
-    # add optional plots if verbose >= 3?
-
-def barplot(ax, x, y, bottom=None, plot_bottom=True,
-            title=None, xlab=None, ylab=None, xlim=None, ylim=None, label=None,
-            vertical_xlabs=False, colors=DEF_COLORS, bcolors=DEF_COLORS):
-    xticks = None
-    if any((isinstance(xx,str) for xx in x)):
-        xnames = x
-        x = tuple(range(len(x)))
-        xticks = x
-    if bottom is not None and plot_bottom:
-        ax.bar(x, bottom,
-               color=bcolors[:len(x)] if isinstance(bcolors,tuple) else bcolors)
-    ax.bar(x, y, bottom=bottom, label=label,
-           color=colors[:len(x)] if isinstance(colors,tuple) else colors)
-    if title: ax.set_title(title, fontsize=14)
-    if xlab: ax.set_xlabel(xlab, fontsize=12)
-    if ylab: ax.set_ylabel(ylab, fontsize=12)
-    if xlim: ax.set_xlim(xlim[0],xlim[1])
-    if ylim: ax.set_ylim(ylim[0],ylim[1])
-    if xticks:
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(xnames, fontsize=10)
-        if vertical_xlabs:
-            for tick in ax.get_xticklabels():
-                tick.set_rotation(90)
-
 def bar_per_source(ax, df, fun, ylab, title,
-                   colors='black', bcolors=DEF_COLORS):
+                   colors='black', bcolors=utils.DEF_COLORS):
     sources = np.unique(df.source)
-    barplot(ax, sources,
-            [fun(df[np.logical_and(df.source==src,df.blocked)]) for src in sources],
-            bottom=
-            [fun(df[np.logical_and(df.source==src,np.logical_not(df.blocked))])
-             for src in sources],
-            ylab=ylab, title=title, colors=colors, bcolors=bcolors)
+    utils.barplot(
+        ax, sources,
+        [fun(df[np.logical_and(df.source==src,df.blocked)]) for src in sources],
+        bottom=
+        [fun(df[np.logical_and(df.source==src,np.logical_not(df.blocked))])
+         for src in sources],
+        ylab=ylab, title=title, colors=colors, bcolors=bcolors
+    )
 
-def clean_figure(ax):
-    ax.set_xticks(())
-    ax.set_yticks(())
-    ax.set_xticklabels(())
-    ax.set_yticklabels(())
-
-def count(txt, sep):
-    if isinstance(txt,str):
-        return len(list(filter(None,re.split(sep,txt))))
-    else:
-        return [len(list(filter(None,re.split(sep,s)))) for s in txt]
 def count_words(txt, sep=' | - |\t|\n\r|\n'):
-    return count(txt,sep)
+    return utils.count(txt,sep)
 def count_sentences(txt, sep='\. |\.\n|\.\r'):
-    return count(txt,sep)
+    return utils.count(txt,sep)
 def count_paragraphs(txt, sep='\n|\n\r'):
-    return count(txt,sep)
+    return utils.count(txt,sep)
 
 def draw():
     plt.get_current_fig_manager().window.showMaximized()
@@ -429,12 +314,10 @@ def draw():
 
 if __name__ == "__main__":
     df = load_data(r'..\Data\articles')
-    info(df)
+    utils.info(df)
     data_description(df.copy())
     validity_tests(df.copy())
     lengths_analysis(
         df[df.section.isin(('חדשות','כלכלה','כסף','ספורט','אוכל'))].copy(),
         by='section')
     plt.show()
-
-# TODO move infra to general module
