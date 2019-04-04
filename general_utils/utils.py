@@ -107,8 +107,34 @@ def info(df, verbose=1):
         print('')
     # add optional plots if verbose >= 3?
 
-	
+def count(txt, sep):
+    '''
+    Count tokens in text.
+    :param txt: string or iterable of strings.
+    :param sep: separator for text.
+    :return: count of tokens or list of counts.
+    '''
+    if isinstance(txt,str):
+        return len(list(filter(None,re.split(sep,txt))))
+    else:
+        return [len(list(filter(None,re.split(sep,s)))) for s in txt]
+
 ##################   PLOT UTILS   ##################
+
+def draw():
+    plt.get_current_fig_manager().window.showMaximized()
+    plt.draw()
+    plt.pause(1e-17)
+    plt.tight_layout()
+
+def clean_figure(ax):
+    '''
+    Clean an empty figure (remove x,y axes and ticks).
+    '''
+    ax.set_xticks(())
+    ax.set_yticks(())
+    ax.set_xticklabels(())
+    ax.set_yticklabels(())
 
 DEF_COLORS = ('blue','red','green','purple','orange','grey','pink')
 
@@ -139,24 +165,3 @@ def barplot(ax, x, y, bottom=None, plot_bottom=True,
         if vertical_xlabs:
             for tick in ax.get_xticklabels():
                 tick.set_rotation(90)
-
-def clean_figure(ax):
-    '''
-    Clean an empty figure (remove x,y axes and ticks).
-    '''
-    ax.set_xticks(())
-    ax.set_yticks(())
-    ax.set_xticklabels(())
-    ax.set_yticklabels(())
-
-def count(txt, sep):
-    '''
-    Count tokens in text.
-    :param txt: string or iterable of strings.
-    :param sep: separator for text.
-    :return: count of tokens or list of counts.
-    '''
-    if isinstance(txt,str):
-        return len(list(filter(None,re.split(sep,txt))))
-    else:
-        return [len(list(filter(None,re.split(sep,s)))) for s in txt]

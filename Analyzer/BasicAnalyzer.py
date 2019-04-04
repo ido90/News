@@ -56,7 +56,7 @@ def data_description(df):
     author_concentration(axs[1,1], df)
     top_authors(axs[1,2], df)
     # draw
-    draw()
+    utils.draw()
 
 def validity_tests(df):
     sources = np.unique(df['source'])
@@ -98,7 +98,7 @@ def validity_tests(df):
     for i in range(2,len(sources)):
         utils.clean_figure(axs[2,i])
     # draw
-    draw()
+    utils.draw()
 
 def lengths_analysis(df, by=None):
     f, axs = plt.subplots(3, 3)
@@ -144,7 +144,7 @@ def lengths_analysis(df, by=None):
         else:
             ax.set_title('')
     # draw
-    draw()
+    utils.draw()
 
 ############## LOAD DATA ##############
 
@@ -183,7 +183,7 @@ def date_hist(ax, df, old_thresh=np.datetime64(datetime(2019,3,1))):
         bottom += date_count[src]
     ax.legend(loc='upper left')
 
-def author_concentration(ax1, df):
+def author_concentration(ax, df):
     n = 0
     for k,src in enumerate(np.unique(df.source)):
         # calculate
@@ -197,16 +197,16 @@ def author_concentration(ax1, df):
         arts_per_aut = np.cumsum(arts_per_aut)
         n = max(n,len(authors))
         # plot
-        ax1.plot(list(range(len(arts_per_aut))), 100*arts_per_aut/d.shape[0],
+        ax.plot(list(range(len(arts_per_aut))), 100*arts_per_aut/d.shape[0],
                 ('b-','r-','g-')[k], label=src)
-        ax1.set_title('Authors', fontsize=14)
-        ax1.set_xlabel('K', fontsize=12)
-        ax1.set_ylabel(
+        ax.set_title('Authors', fontsize=14)
+        ax.set_xlabel('K', fontsize=12)
+        ax.set_ylabel(
             'Number of articles by most active K authors [%]\n'+
             '(not reaching 100% due to unknown authors)', fontsize=12)
-    ax1.set_xlim((0,n))
-    ax1.set_ylim((0,100))
-    ax1.legend()
+    ax.set_xlim((0,n))
+    ax.set_ylim((0,100))
+    ax.legend()
 
 def top_authors(ax, df, n=5):
     sources = np.unique(df.source)
@@ -303,12 +303,6 @@ def count_sentences(txt, sep='\. |\.\n|\.\r'):
     return utils.count(txt,sep)
 def count_paragraphs(txt, sep='\n|\n\r'):
     return utils.count(txt,sep)
-
-def draw():
-    plt.get_current_fig_manager().window.showMaximized()
-    plt.draw()
-    plt.pause(1e-17)
-    plt.tight_layout()
 
 ############## MAIN ##############
 
