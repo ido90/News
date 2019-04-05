@@ -6,4 +6,4 @@ Due to the choice to work with Hebrew text, most of the state-of-the-art of NLP 
 Instead, the following methods were used for analysis of the data:
 Bag of words
 Context
-word2vec?
+word2vec

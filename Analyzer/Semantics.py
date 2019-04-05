@@ -34,8 +34,9 @@ def get_all_words(texts, chars_to_remove=word_chars_filter,
 
     return all_words
 
-def get_vocabulary(df, col='text', required_freq=5, filter_fun=None):
-    all_words = get_all_words(df[col])
+def get_vocabulary(df=None, col='text', texts=None,
+                   required_freq=5, filter_fun=None):
+    all_words = get_all_words(df[col] if texts is None else texts)
     tab = utils.table(all_words, -1)
     if filter_fun:
         tab = [t for t in tab if filter_fun(t[0])]
@@ -68,15 +69,5 @@ if __name__ == "__main__":
     plt.show()
 
 
-
 # TODO Hebrew stemmer
 # https://www.google.com/url?q=https%3A%2F%2Fgithub.com%2Fiddoberger%2Fawesome-hebrew-nlp&sa=D&usd=2&usg=AFQjCNHD9kq16TroW54hKc-H_iY6Y8xyMA
-
-# similar words by context? (NLTK? spaCY?)
-
-# TODO simple sklearn classifications
-# classified element: text, paragraph, sentence.
-# class: source, section.
-# methods: perceptron, Naive Bayes, trees, SVM, 2-layer NN.
-
-# word2vec hebrew?

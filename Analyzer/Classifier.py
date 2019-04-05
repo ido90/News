@@ -22,6 +22,11 @@ SEPARATOR = {
     'word': ' | - |\t|\n\r|\n'
 }
 
+def filter_major_sections(df):
+    df.section[df.section=='כסף'] = 'כלכלה'
+    df = df[df.section.isin(('חדשות','כלכלה','כסף','ספורט','אוכל'))]
+    return df
+
 def get_labeled_raw_data(df, y_col='source', x_col='text',
                          x_resolution='article', force_balance=True,
                          min_words=4, verbose=0):
@@ -75,7 +80,8 @@ def texts_heuristics(texts):
                                     for w in sm.get_all_words(s) for c in w])
                            for s in texts]),
         'eng_chars_rate': np.nan_to_num(
-            [np.mean(['a'<=c<='z' or 'A'<=c<='Z' for w in sm.get_all_words(s) for c in w])
+            [np.mean(['a'<=c<='z' or 'A'<=c<='Z'
+                      for w in sm.get_all_words(s) for c in w])
              for s in texts]),
         'num_chars_rate': np.nan_to_num([np.mean(['0'<=c<='9'
                                     for w in sm.get_all_words(s) for c in w])
@@ -98,7 +104,7 @@ def texts_to_words(texts, voc):
     return count
 
 def test_models(X_train, X_test, y_train, y_test,
-                models, n_buckets=10, t0=time(), verbose=3):
+                models, n_buckets=10, t0=time(), verbose=2):
     n_samples = [int(len(X_train)/n_buckets) * (i+1)
                  for i in range(n_buckets)]
     n_samples[-1] = len(X_train)
@@ -137,7 +143,7 @@ def plot_results(res, axs, title='Test Classification', reference=None):
         for model in res[test][1]:
             accuracy = res[test][1][model]
             ax.plot(n_samples, accuracy, label=model)
-        ax.set_title(title + f' ({test:s})', fontsize=14)
+        ax.set_title(title + f'\n({test:s})', fontsize=14)
         ax.set_xlabel('Training samples', fontsize=12)
         ax.set_ylabel('Accuracy [%]', fontsize=12)
         ax.set_xlim((n_samples[0],n_samples[-1]))
@@ -146,39 +152,63 @@ def plot_results(res, axs, title='Test Classification', reference=None):
     utils.draw()
 
 
-if __name__ == "__main__":
-    t0 = time()
-    df = ba.load_data(r'..\Data\articles')
-    print(f'Data loaded ({time()-t0:.0f} [s]).')
-    data = get_labeled_raw_data(df[~df.blocked], verbose=1,
-                                x_resolution='article', y_col='source')
-    print(f'Raw (x,y) data created ({time()-t0:.0f} [s]).')
-
-    # TODO: choosing the vocabulary by frequency of words in
-    #       both train & test data sets is a slight cheat.
-    voc = sm.get_vocabulary(df, required_freq=300, # TODO reduce to 10?
-                            filter_fun=lambda w: any('א'<=c<='ת' for c in w))
-    print(f'Vocabulary of {len(voc):d} words is set ({time()-t0:.0f} [s]).')
-
-    X = extract_features(data[0], voc, normalize=True)
-    print(f'Features extracted ({time()-t0:.0f} [s]).')
+def prepare_data_and_test(df, classifiers, x='article', y='source',
+                          axs=None, t0=time()):
+    # convert to pairs (x,y) and split to train & test
+    data = get_labeled_raw_data(df, verbose=1, force_balance=True,
+                                x_resolution=x, y_col=y)
     X_train, X_test, y_train, y_test =\
-        train_test_split(X, data[1], test_size=0.2, random_state=0)
+        train_test_split(data[0], data[1], test_size=0.2, random_state=0)
     print(f'Train & test groups defined ({time()-t0:.0f} [s]).')
 
-    res = test_models(X_train, X_test, y_train, y_test,
-                      {'Perceptron':(Perceptron,{'max_iter':3000}),
-                       'Tree':(DecisionTreeClassifier,{})},
-                      t0=t0)
+    # transform x to features
+    voc = sm.get_vocabulary(texts=X_train, required_freq=100, # TODO reduce to 10?
+                            filter_fun=lambda w: any('א'<=c<='ת' for c in w))
+    print(f'Vocabulary of {len(voc):d} words is set ({time()-t0:.0f} [s]).')
+    X_train = extract_features(X_train, voc)
+    X_test = extract_features(X_test, voc)
+    print(f'Features extracted ({time()-t0:.0f} [s]).')
+
+    # train & test
+    res = test_models(X_train, X_test, y_train, y_test, classifiers, t0=t0)
     print(f'Test finished ({time()-t0:.0f} [s]).')
-    fig,axs = plt.subplots(2,2)
-    plot_results(res, axs[0,:], 'Classification: article -> source',
+    if axs is None:
+        fig,axs = plt.subplots(1,2)
+    plot_results(res, axs, x+' -> '+y,
                  100/len(np.unique(y_train)))
-    # TODO models, models configurations, and more stats (e.g. train error, model main features)
-    # TODO choose more problems rather than sentence->source
+
+def main(df, xs, ys, classifiers):
+    assert(len(xs)==len(ys)), "Inconsistent configuration."
+    fig, axs = plt.subplots(len(xs), 2)
+    for i,(x,y) in enumerate(zip(xs,ys)):
+        d = df.copy()
+        if x!='sentence':
+            d = d[~d.blocked]
+        if y=='section':
+            d = filter_major_sections(d)
+        prepare_data_and_test(d, classifiers, x, y, axs[i,:])
+
+
+if __name__ == "__main__":
+    df = ba.load_data(r'..\Data\articles')
+
+    # configuration
+    xs = ['article','article']
+    ys = ['source','section']
+    classifiers = {
+        'Perceptron': (Perceptron, {'max_iter': 3000}),
+        'Tree': (DecisionTreeClassifier, {})
+    }
+
+    # run
+    main(df, xs, ys, classifiers)
     plt.show()
 
-# stem
-# choose models
+
+# TODO
+# stemmer
+# choose models (make sure they normalize the input for training if needed):
+#       perceptron, Naive Bayes, trees, SVM, 2-layer NN.
+# models configuration and analysis (which features are dominant?)
 # engineer features / feature selection?
-# think about experiments
+# think about more problems to solve
