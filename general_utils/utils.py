@@ -149,6 +149,7 @@ def barplot(ax, x, y, bottom=None, plot_bottom=True,
         xnames = x
         x = tuple(range(len(x)))
         xticks = x
+        xlim = (-0.5,len(xnames)-0.5)
     if bottom is not None and plot_bottom:
         ax.bar(x, bottom,
                color=bcolors[:len(x)] if isinstance(bcolors,tuple) else bcolors)

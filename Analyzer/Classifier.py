@@ -15,6 +15,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+from sklearn import metrics
 import general_utils.utils as utils
 import Scrapper.ScrapperTools as st
 import Analyzer.BasicAnalyzer as ba
@@ -41,22 +42,27 @@ def prepare_data_and_test(df, classifiers, x='article', y='source',
     # convert to pairs (x,y) and split to train & test
     data = get_labeled_raw_data(df, verbose=1, force_balance=force_balance,
                                 x_resolution=x, y_col=y)
-    X_train, X_test, y_train, y_test = \
+    X_train_raw, X_test_raw, y_train, y_test = \
         train_test_split(data[0], data[1], test_size=0.2, random_state=0)
     print(f'Train & test groups defined ({time()-t0:.0f} [s]).')
 
-    # transform x to features
-    voc = sm.get_vocabulary(texts=X_train, required_freq=100,  # TODO reduce to 10?
+    # extract features
+    voc = sm.get_vocabulary(texts=X_train_raw, required_freq=20,
                             filter_fun=lambda w: any('א' <= c <= 'ת' for c in w))
     print(f'Vocabulary of {len(voc):d} words is set ({time()-t0:.0f} [s]).')
-    X_train = extract_features(X_train, voc, add_heuristics=add_heuristics)
-    X_test = extract_features(X_test, voc, add_heuristics=add_heuristics)
+    X_train = extract_features(X_train_raw, voc, add_heuristics=add_heuristics)
+    X_test = extract_features(X_test_raw, voc, add_heuristics=add_heuristics)
     print(f'Features extracted ({time()-t0:.0f} [s]).')
 
     # train & test
-    res = test_models(X_train, X_test, y_train, y_test, classifiers,
-                      diagnosis=diagnosis, t0=t0)
+    res, models = test_models(X_train, X_test, y_train, y_test, classifiers,
+                              t0=t0, verbose=3)
     print(f'Test finished ({time()-t0:.0f} [s]).')
+
+    # results analysis
+    if diagnosis:
+        models_diagnosis(models.values(), list(X_train.columns),
+                         x+' -> '+y, max_features=30)
     if fig is None:
         fig = plt.subplots(1, 2)
     plt.figure(fig[0].number)
@@ -73,14 +79,14 @@ SEPARATOR = {
     'word': ' | - |\t|\n\r|\n'
 }
 
-def filter_major_sections(df):
+def filter_major_sections(df, sections=('חדשות','כלכלה','כסף','ספורט','אוכל')):
     df.section[df.section=='כסף'] = 'כלכלה'
-    df = df[df.section.isin(('חדשות','כלכלה','כסף','ספורט','אוכל'))]
+    df = df[df.section.isin(sections)]
     return df
 
 def get_labeled_raw_data(df, y_col='source', x_col='text',
                          x_resolution='article', force_balance=True,
-                         min_words=10, verbose=0):
+                         min_words=12, verbose=0):
     X0 = [x for x in df[x_col]]
     Y0 = [y for y in df[y_col]]
 
@@ -108,7 +114,6 @@ def get_labeled_raw_data(df, y_col='source', x_col='text',
                 del X[i]
                 del Y[i]
 
-    #return tuple((x,y) for x,y in zip(X,Y))
     return (X,Y)
 
 def extract_features(raw_texts, voc, add_heuristics=True, normalize=False):
@@ -158,20 +163,21 @@ def texts_to_words(texts, voc):
 #################   TRAIN & TEST   #################
 
 def test_models(X_train, X_test, y_train, y_test,
-                models, n_buckets=5, t0=time(), diagnosis=False, verbose=2):
+                classifiers, n_buckets=5, t0=time(), verbose=2):
     n_samples = [int(len(X_train)/n_buckets) * (i+1)
                  for i in range(n_buckets)]
     n_samples[-1] = len(X_train)
     res = {'train group':[n_samples,{}], 'test group':[n_samples,{}]}
-    for m in models:
+    models = {}
+    for m in classifiers:
         res['train group'][1][m] = list()
         res['test group'][1][m] = list()
         for i,n in enumerate(n_samples):
-            if verbose >= 3:
+            if verbose >= 4:
                 print(f'\t{m:s}: group {i+1:d}/{len(n_samples):d} ' +
                       f'({time()-t0:.0f} [s])...')
             # train
-            model = models[m][0](**models[m][1])
+            model = classifiers[m][0](**classifiers[m][1])
             model.fit(X_train[:n], y_train[:n])
             # test
             res['train group'][1][m].append(
@@ -180,18 +186,14 @@ def test_models(X_train, X_test, y_train, y_test,
             res['test group'][1][m].append(
                 100*np.mean([y1==y2 for y1,y2 in
                                zip(y_test,model.predict(X_test))]))
+            models[m] = model
         if verbose >= 2:
             print(f'{m:s} finished ({time()-t0:.0f} [s]).')
-        if diagnosis:
-            if models[m][0]==Perceptron:
-                perceptron_diagnosis(model, list(X_train.columns))
-            elif models[m][0] == DecisionTreeClassifier:
-                tree_diagnosis(model, list(X_train.columns))
-            elif models[m][0] == RandomForestClassifier:
-                random_forest_diagnosis(model, list(X_train.columns))
-            elif models[m][0] == MultinomialNB:
-                naive_bayes_diagnosis(model, list(X_train.columns))
-    return res
+            if verbose >= 3:
+                print(*list(np.unique(y_test)), sep=', ')
+                print(metrics.confusion_matrix(y_test,model.predict(X_test),
+                                               labels=np.unique(y_test)))
+    return res, models
 
 def plot_results(res, axs, title='Test Classification', reference=None):
     for i,test in enumerate(res):
@@ -201,7 +203,7 @@ def plot_results(res, axs, title='Test Classification', reference=None):
         if reference is not None:
             ax.plot((n_samples[0], n_samples[-1]),
                     2 * [reference],
-                    'k:', label='Random')
+                    'k--', label='Random')
         # plot actual results
         for model in res[test][1]:
             accuracy = res[test][1][model]
@@ -211,13 +213,37 @@ def plot_results(res, axs, title='Test Classification', reference=None):
         ax.set_ylabel('Accuracy [%]', fontsize=12)
         ax.set_xlim((n_samples[0],n_samples[-1]))
         ax.set_ylim((0,101))
+        ax.grid(color='k', linestyle=':', linewidth=1)
         ax.legend(loc='upper left')
     utils.draw()
 
 
 #################   MODEL DIAGNOSIS   #################
 
-def perceptron_diagnosis(model, col_names=None, fig=None):
+def models_diagnosis(models, col_names=None, title=None, fig=None, **kwargs):
+    supported_classifiers = (Perceptron, DecisionTreeClassifier,
+                            RandomForestClassifier, MultinomialNB)
+    if fig is None:
+        fig = plt.subplots(len([m for m in models
+                                if m.__class__ in supported_classifiers]),
+                           1)
+    i = 0
+    for m in models:
+        title_i = title if i==0 else None
+        if isinstance(m, Perceptron):
+            perceptron_diagnosis(m, col_names, title_i, (fig[0],fig[1][i]), **kwargs)
+        elif isinstance(m, DecisionTreeClassifier):
+            tree_diagnosis(m, col_names, title_i, (fig[0],fig[1][i]), **kwargs)
+        elif isinstance(m, RandomForestClassifier):
+            random_forest_diagnosis(m, col_names, title_i, (fig[0],fig[1][i]), **kwargs)
+        elif isinstance(m, MultinomialNB):
+            naive_bayes_diagnosis(m, col_names, title_i, (fig[0],fig[1][i]), **kwargs)
+        else:
+            i -= 1
+        i += 1
+
+def perceptron_diagnosis(model, col_names=None, title=None, fig=None,
+                         max_features=50):
     # input validation
     if len(model.coef_)<=2:
         raise NotImplementedError('Binary classification diagnosis is ' +
@@ -227,20 +253,26 @@ def perceptron_diagnosis(model, col_names=None, fig=None):
     plt.figure(fig[0].number)
     if col_names is None:
         col_names = list(range(len(model.coef_[0])))
-    col_names = [bidi.get_display(nm) for nm in col_names]
+    col_names = ['intercept'] + [bidi.get_display(nm) for nm in col_names]
     # get std of coefficients
     coef_std = [np.std(model.intercept_)] + \
                [np.std([cfs[i] for cfs in model.coef_])
                 for i in range(len(model.coef_[0]))]
+    if max_features:
+        ids = np.array(coef_std).argsort()[-max_features:][::-1]
+        col_names = [col_names[i] for i in ids]
+        coef_std = [coef_std[i] for i in ids]
     # plot
-    utils.barplot(fig[1], ['intercept']+col_names, coef_std, vertical_xlabs=True,
-                  title=f'Perceptron Diagnosis ({model.n_iter_:d} iterations)',
-                  xlab='Coefficient',
-                  ylab='STD(coef) over classes\n' +
-                       '(TODO note: x values are not necessarily normalized)')
+    pre_title = '' if title is None else title+'\n'
+    utils.barplot(fig[1], col_names, coef_std, vertical_xlabs=True,
+                  title=pre_title + 'Perceptron Diagnosis ' +
+                        f'({model.n_iter_:d} iterations)',
+                  xlab='Feature', colors=('black',),
+                  ylab='STD(coef) over classes\n' + '(not STD(x*coef)!)')
     utils.draw()
 
-def tree_diagnosis(model, col_names=None, fig=None):
+def tree_diagnosis(model, col_names=None, title=None, fig=None,
+                         max_features=50):
     # input validation
     if fig is None:
         fig = plt.subplots(1,1)
@@ -248,14 +280,23 @@ def tree_diagnosis(model, col_names=None, fig=None):
     if col_names is None:
         col_names = list(range(len(model.feature_importances_)))
     col_names = [bidi.get_display(nm) for nm in col_names]
+    # get importance
+    importance = model.feature_importances_
+    if max_features:
+        ids = np.array(importance).argsort()[-max_features:][::-1]
+        col_names = [col_names[i] for i in ids]
+        importance = [importance[i] for i in ids]
     # plot
-    utils.barplot(fig[1], col_names, model.feature_importances_, vertical_xlabs=True,
-                  title=f'Decision Tree Diagnosis (Depth: {model.tree_.max_depth:d})',
-                  xlab='Feature',
+    pre_title = '' if title is None else title+'\n'
+    utils.barplot(fig[1], col_names, importance, vertical_xlabs=True,
+                  title=pre_title + 'Decision Tree Diagnosis ' +
+                        f'(Depth: {model.tree_.max_depth:d})',
+                  xlab='Feature', colors=('black',),
                   ylab='Gini importance')
     utils.draw()
 
-def random_forest_diagnosis(model, col_names=None, fig=None):
+def random_forest_diagnosis(model, col_names=None, title=None, fig=None,
+                         max_features=50):
     # input validation
     if fig is None:
         fig = plt.subplots(1,1)
@@ -263,14 +304,23 @@ def random_forest_diagnosis(model, col_names=None, fig=None):
     if col_names is None:
         col_names = list(range(len(model.feature_importances_)))
     col_names = [bidi.get_display(nm) for nm in col_names]
+    # get importance
+    importance = model.feature_importances_
+    if max_features:
+        ids = np.array(importance).argsort()[-max_features:][::-1]
+        col_names = [col_names[i] for i in ids]
+        importance = [importance[i] for i in ids]
     # plot
-    utils.barplot(fig[1], col_names, model.feature_importances_, vertical_xlabs=True,
-                  title=f'Random Forest Diagnosis ({len(model.estimators_):d} trees)',
-                  xlab='Feature',
-                  ylab='Average Gini importance')
+    pre_title = '' if title is None else title+'\n'
+    utils.barplot(fig[1], col_names, importance, vertical_xlabs=True,
+                  title=pre_title + 'Random Forest Diagnosis ' +
+                        f'({len(model.estimators_):d} trees)',
+                  xlab='Feature', colors=('black',),
+                  ylab='Gini importance')
     utils.draw()
 
-def naive_bayes_diagnosis(model, col_names=None, fig=None):
+def naive_bayes_diagnosis(model, col_names=None, title=None, fig=None,
+                         max_features=50):
     # input validation
     if fig is None:
         fig = plt.subplots(1,1)
@@ -281,11 +331,16 @@ def naive_bayes_diagnosis(model, col_names=None, fig=None):
     # get std of coefficients
     log_probs_std = [np.std([lp[i] for lp in model.feature_log_prob_])
                      for i in range(len(model.feature_log_prob_[0]))]
+    if max_features:
+        ids = np.array(log_probs_std).argsort()[-max_features:][::-1]
+        col_names = [col_names[i] for i in ids]
+        log_probs_std = [log_probs_std[i] for i in ids]
     # plot
+    pre_title = '' if title is None else title+'\n'
     utils.barplot(fig[1], col_names, log_probs_std, vertical_xlabs=True,
-                  title=f'Naive Bayes Diagnosis',
-                  xlab='Feature',
-                  ylab='STD(log probability) over classes')
+                  title=pre_title+f'Naive Bayes Diagnosis',
+                  xlab='Feature', colors=('black',),
+                  ylab='STD(log probability)\nover classes')
     utils.draw()
 
 
@@ -295,37 +350,37 @@ if __name__ == "__main__":
     df = ba.load_data(r'..\Data\articles')
 
     # configuration
-    xs = ['article','article','sentence']
-    ys = ['source','section','section']
+    xs = ['article','paragraph','paragraph']
+    ys = ['section','section','source']
 
     classifiers = {
-        'Perceptron': (Perceptron, {'max_iter': 1000, 'tol': -np.inf, 'early_stopping': True, 'validation_fraction':0.2}),
-        'Tree': (DecisionTreeClassifier, {'criterion':'entropy', 'min_samples_leaf':2, 'max_depth':12}),
-        'Random Forest': (RandomForestClassifier, {'criterion':'entropy', 'n_estimators':40, 'max_depth':4, 'min_samples_leaf':2, 'oob_score':True}),
+        'Perceptron': (Perceptron, {'max_iter': 1000, 'tol': -np.inf, 'early_stopping': True, 'validation_fraction': 0.2}),
+        #'Tree': (DecisionTreeClassifier, {'criterion':'entropy', 'min_samples_leaf':2, 'max_depth':12}),
+        'Random Forest': (RandomForestClassifier, {'criterion':'entropy', 'n_estimators':50, 'max_depth':4, 'min_samples_leaf':2, 'oob_score':True}),
         'Naive Bayes': (MultinomialNB, {'alpha':2}), # alpha = number of fictive counts in Laplace (or Lidstone) smoothing.
-        'SVM': (SVC, {'kernel':'rbf', 'gamma':'scale'}),
+        'SVM': (SVC, {'kernel':'rbf', 'gamma':'scale'}), # Note: sensitive to the non-normalized features.
         'Neural Network': (MLPClassifier, {'hidden_layer_sizes':(100,), 'activation':'tanh', 'learning_rate':'constant', 'max_iter':1000, 'early_stopping':True, 'validation_fraction':0.2})
     }
 
     # run
-    main(df, xs[:3], ys[:3], classifiers, force_balance=True, diagnosis=False)
-    main(df, xs[:3], ys[:3], classifiers, force_balance=True, diagnosis=False, add_heuristics=False)
+    main(df, xs, ys, classifiers, force_balance=True, diagnosis=True,  add_heuristics=True)
+    main(df, xs, ys, classifiers, force_balance=True, diagnosis=False, add_heuristics=False)
     plt.show()
 
 
-# note: force_balance causes loss of data (to force equal classes),
-# which could be avoided by using 'class_weight':'balanced' in the classifiers,
-# yet it was decided to force balance in order to make sure that
-# the classification can't be won by simple classifier bias.
+#################   POSSIBLE EXTENSIONS   #################
+'''
+1. Think about more interesting classification problems.
 
+2. Apply stemming to words (see Semantics module).
 
-# TODO
-# check CountVectorizer
-#    http://www.insightsbot.com/blog/R8fu5/bag-of-words-algorithm-in-python-introduction
-# feature selection: only BoW features!/
-#                    lasso (built-in sklearn?) /
-#                    according to perceptron's (normalized) betas /
-#                    according to accuracy of estimation when used alone /
-#                    PCA?
-# features engineering?
-# think about more interesting classification problems to solve
+3. Apply some regularization (there're currently many features), such as:
+   - Lasso
+   - Feature selection by Perceptron's normalized coefficients
+   - Feature selection by feature's independent classification power
+   - PCA
+
+4. Don't omit data in order to balance the classes.
+   - class_weight = 'balanced' can keep the classifiers from getting to biased.
+   - Should make sure that the test mechanism cannot be exploited by classifier bias.
+'''
