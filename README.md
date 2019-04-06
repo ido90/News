@@ -30,11 +30,11 @@ This could be avoided by balancing the classifiers through classes weights, and 
 However, when the results were displayed vs. the size of the train group, it seemed that the amount of omitted data was smaller than the sensitivity of the classifiers.
 
 #### Features
-To limit the vocabulary (and also reduce some of the noise), only Hebrew words with at least 20 appearances in the (training) data were used, with a few hundred stopwords filtered out.
+To limit the vocabulary (and also reduce some of the noise), only **Hebrew words** with at least 20 appearances in the (training) data were counted, with a few hundred stopwords filtered out.
 
-Several heuristical features were added to the vocabulary-features: total words count, average word length, percent of Hebrew characters, percent of English characters and percent of numeric characters.
+Several heuristical features were added to the vocabulary-features: **total words count, average word length, percent of Hebrew characters, percent of English characters and percent of numeric characters**.
 
-To simplify the implementation, the fatures were not normalized, but rather left as raw counters and heuristics.
+To simplify the implementation, the fatures were **not normalized**, but rather left as raw counters and heuristics.
 Note that (1) most of the classifiers below should be insensitive to scale, and (2) the scale of the features seemed to be quite simliar in terms of orders of magnitude.
 
 #### Classifiers
@@ -50,6 +50,8 @@ The following classifiers were used through Scikit-learn:
 - **SVM** with RBF kernel. Note that this classifier is particularly sensitive to the scale of the features.
 
 - **Neural Network** with a single hidden layer.
+
+No explicit regularization was used (e.g. Lasso or feature-selection), even though it may significantly help to deal with the large number of features along with the not-so-large number of articles.
 
 ### Results
 
