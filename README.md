@@ -83,7 +83,6 @@ To simplify the implementation, the fatures were **not normalized**, but rather 
 Note that (1) most of the classifiers below should be insensitive to scale, and (2) the scale of the features seemed to be quite simliar in terms of orders of magnitude.
 
 ### Classifiers
-
 The following classifiers were used through Scikit-learn:
 
 - **Perceptron**.
@@ -95,13 +94,34 @@ The following classifiers were used through Scikit-learn:
 No explicit regularization was used (e.g. Lasso or feature-selection), even though it may significantly help to deal with the large number of features along with the not-so-large number of articles.
 
 ## Results
+### Did we solve the problem?
+- Classification to the right **section** among 4 possibilities (news, economics, sports and food) was quite successful for **articles (~90% accuracy)** and reasonable for **paragraphs (~75% accuracy)**. In particular, it means that the **semantics of a field appear in most of the paragraphs of a typical relevant article**, and not only in selected "key" paragraphs.
+- According to the **confusion matrix** of the Naive Bayes classifier, news and economics are the most confusing sections.
+- Classification of paragraphs to the right **source** among 3 possibilities was less successful, with only **~60% accuracy**. This is intuitively consistent with the previous results of frequency of appearances of politicians in articles, where no significant differences were found between the sources.
 
-TODO
+### Classifiers comparison
+- **Naive Bayes** and the **Neural Network** did well in classification of both articles and paragraphs. **Perceptron** also did well on articles and **SVM** also did well on paragraphs. **Random Forest** performed quite bad in all the tests. Note that quite small efforts were put into tuning of the classifiers, which might have significantly disturbed the results.
+- Naive Bayes classifier achieved **impressive results (lower accuracy by few percents) with very small amounts of training data - 50 articles or 300 paragraphs**, which were ~20% of the availavle data.
+
+| ![](https://github.com/ido90/News/blob/master/Output/Classification/Classification%20results%20only%20semantics.png) |
+| :--: |
+| Classification accuracy using only Bag-of-Words features (without heuristical features) |
+
+### Important features
+- In classification of articles, **the various classifiers chose quite different words as dominant factors**, which may indicate that combination of the classifiers may exploit more information and achieve better results. Such a combination was not tried.
+- In classification of paragraphs, on the other hand, the classifiers did use quite consistent significant words, such as game, points, vegetables, etc.
+- The more successful classifiers **did not assign large importance to the heuristical features** (e.g. average length of words), but rather focused on the Bag-of-Words count. Furthermore, the SVM and NN classifiers seemed to be significantly negatively affected by the existence of those features (which might have been expected in the case of the scale-sensitive SVM).
+
+| ![](https://github.com/ido90/News/blob/master/Output/Classification/features%20paragraph%20to%20section.png) |
+| :--: |
+| Importance of features in classification of paragraphs to sections (including heuristical features) |
 
 _________________________________
 
 # TODO
 
-Context
+Contexts
+
+Graph of words with common articles
 
 word2vec
