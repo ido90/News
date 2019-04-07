@@ -12,7 +12,7 @@ The crawling found **few hundred articles per website** in March 2019.
 Most of the scraped data look valid, with blocked articles in Haaretz being the primary exception.
 For more anomalies and some basic properties of the data, see 'Output/Data description and validation'.
 
-!(https://github.com/ido90/News/blob/master/Output/Data%20description%20and%20validation/basic_data_description.png)
+![](https://github.com/ido90/News/blob/master/Output/Data%20description%20and%20validation/basic_data_description.png)
 
 # Scope and Limitations
 Due to the choice to work with Hebrew text, many of the state-of-the-art of NLP conventional processing steps was of low availability (e.g. stemming, tagging of part-of-speech, syntax parsing, semantic entity classification, etc.).
@@ -56,7 +56,7 @@ After the corrections, the main possible *overshooting* counters are expected to
 - The representation of the various parties seems quite similar over the 3 websites.
 - More insights may be observed once either additional data are scraped, or the count of the names manages to clean the noise of disambiguities.
 
-!(https://github.com/ido90/News/blob/master/Output/Semantic%20stats/Politics.png)
+![](https://github.com/ido90/News/blob/master/Output/Semantic%20stats/Politics.png)
 
 _________________________________
 
