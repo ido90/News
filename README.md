@@ -1,5 +1,4 @@
 # Abstract: Scraping and Analysis of Hebrew Newspapers
-Scraping and some analysis of several popular Israeli news websites.
 
 TODO
 _________________________________
@@ -44,7 +43,7 @@ Note that the appearances may be associated with positive, negative or neutral c
 
 Some of the names are very ambiguous (e.g. Avoda=work, Culanu=all of us, and Levy which is a very common surname). The effect of the ambiguity was attempted to be minimized (e.g. requiring Orly Levy rather than merely Levy, and actually replacing Peretz with Smotrich), yet there may be significant inaccuracies in many names.
 
-After the corrections, the main possible *overshooting* counters are expected to be Zehut, Culanu and Gesher.
+**After the corrections, the main possible *overshooting* counters are expected to be Zehut, Culanu and Gesher**.
 
 ## Results
 
@@ -56,7 +55,7 @@ After the corrections, the main possible *overshooting* counters are expected to
 - The representation of the various parties seems quite similar over the 3 websites.
 - More insights may be observed once either additional data are scraped, or the count of the names manages to clean the noise of disambiguities.
 
-![](https://github.com/ido90/News/blob/master/Output/Semantic%20stats/Politics.png)
+![](https://github.com/ido90/News/blob/master/Output/Semantic%20stats/Politics%20by%20source.png)
 
 _________________________________
 
