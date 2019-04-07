@@ -72,13 +72,6 @@ def prepare_data_and_test(df, classifiers, x='article', y='source',
 
 #################   DATA PRE-PROCESSING   #################
 
-SEPARATOR = {
-    'article': 'NEVER_SPLIT',
-    'paragraph': '\n|\n\r',
-    'sentence': '\. |\.\n|\.\r',
-    'word': ' | - |\t|\n\r|\n'
-}
-
 def filter_major_sections(df, sections=('חדשות','כלכלה','כסף','ספורט','אוכל')):
     df.section[df.section=='כסף'] = 'כלכלה'
     df = df[df.section.isin(sections)]
@@ -91,7 +84,7 @@ def get_labeled_raw_data(df, y_col='source', x_col='text',
     Y0 = [y for y in df[y_col]]
 
     # split text to desired units (e.g. sentences)
-    sep = SEPARATOR[x_resolution]
+    sep = sm.SEPARATOR[x_resolution]
     X,Y = list(), list()
     for x0,y0 in zip(X0,Y0):
         split_x = [s.strip().strip(sm.word_chars_filter) for s in
@@ -150,7 +143,7 @@ def texts_heuristics(texts):
 #     return {w: [ws.count(w) for ws in words_per_text] for w in voc}
 
 def texts_to_words(texts, voc):
-    sep = SEPARATOR['word']
+    sep = sm.SEPARATOR['word']
     count = {w: len(texts)*[0] for w in voc}
     for i,txt in enumerate(texts):
         for w in re.split(sep,txt):
@@ -190,6 +183,7 @@ def test_models(X_train, X_test, y_train, y_test,
         if verbose >= 2:
             print(f'{m:s} finished ({time()-t0:.0f} [s]).')
             if verbose >= 3:
+                print('Confusion matrix:')
                 print(*list(np.unique(y_test)), sep=', ')
                 print(metrics.confusion_matrix(y_test,model.predict(X_test),
                                                labels=np.unique(y_test)))
