@@ -82,7 +82,7 @@ def plot_words_repetitions(tab):
     utils.draw()
 
 def count_parties(
-        ax, df, col='text', by='source', logscale=False,
+        ax, df, col='text', by='source', binary_per_text=False, logscale=False,
         keys=('ליכוד', ('ביבי','נתניהו'), ('כחול לבן','כחול-לבן'), 'גנץ', 'העבודה', 'גבאי',
               ('חד"ש','תע"ל'), 'עודה', 'יהדות התורה', 'ליצמן', 'איחוד הימין', "סמוטריץ'",
               'הימין החדש','בנט', 'זהות', 'פייגלין', 'מרצ', 'זנדברג', 'ש"ס', 'דרעי',
@@ -94,44 +94,52 @@ def count_parties(
 
     count = {grp: len(keys)*[0] for grp in groups}
     for grp in groups:
-        # one-word keys
         for i,txt in enumerate(df[df[by]==grp][col]):
-            for w in re.split(sep, txt):
-                w = re.sub('\.|,|\(|\)|;|:|\t', '', w).strip()
-                for j,k in enumerate(keys):
-                    if w.endswith(k):
-                        count[grp][j] += 1
-        # multi-word keys
-        for j, key in enumerate(keys):
-            if isinstance(key,tuple):
-                for k in key:
+            for j, key in enumerate(keys):
+                # multi-word keys
+                appears = 0
+                if isinstance(key, tuple):
+                    for k in key:
+                        if ' ' in k:
+                            appears = txt.count(k)
+                            count[grp][j] += bool(appears) if binary_per_text else appears
+                            if binary_per_text: break
+                else:
+                    k = key
                     if ' ' in k:
-                        count[grp][j] += '\n'.join(df[df[by]==grp][col]).count(k)
-            else:
-                k = key
-                if ' ' in k:
-                    count[grp][j] += '\n'.join(df[df[by]==grp][col]).count(k)
+                        appears = txt.count(k)
+                        count[grp][j] += bool(appears) if binary_per_text else appears
+                if binary_per_text and appears:
+                    continue
+                # one-word keys
+                for w in re.split(sep, txt):
+                    w = re.sub('\.|,|\(|\)|;|:|\t', '', w).strip()
+                    if w.endswith(key):
+                        count[grp][j] += 1
+                        if binary_per_text: break
 
     keys = tuple(k[0]+' /\n'+k[1] if isinstance(k,tuple) else k for k in keys)
     keys = tuple(bidi.get_display(k) for k in keys)
-    colors = ('b', 'r', 'g')
+    colors = utils.DEF_COLORS
     bottom = np.array([0 for _ in keys])
 
-    for group,color in zip(groups,colors):
+    ylab = ('Texts with the expression' if binary_per_text else 'Total appearances') +\
+           '\n(as end of a word)'
+    for i,group in enumerate(groups):
         utils.barplot(ax, keys, count[group], bottom=bottom, plot_bottom=False,
-                      ylab='Total appearances\n(as end of a word)',
-                      title='Frequency of appearance', vertical_xlabs=True,
-                      colors=color, label=group)
+                      ylab=ylab, title='Frequency of appearance', vertical_xlabs=True,
+                      colors=colors[i%len(colors)], label=bidi.get_display(group))
         bottom += count[group]
     if logscale:
         ax.set_yscale('log')
     ax.legend()
     utils.draw()
-    # TODO show contexts
 
 
 if __name__ == "__main__":
     df = ba.load_data(r'..\Data\articles')
+
+    # Words frequencies
     all_words = get_all_words(df.text,
                               filter_fun=lambda w: any('א'<=c<='ת' for c in w))
     tt = utils.table(all_words, -1)
@@ -140,6 +148,13 @@ if __name__ == "__main__":
     print('Most repeating words:')
     pprint(tt[:10])
     plot_words_repetitions(tt)
-    fig,ax = plt.subplots(1,1)
-    count_parties(ax, df)
+
+    # Politics
+    fig,ax = plt.subplots(1,2)
+    count_parties(ax[0], df)
+    count_parties(ax[1], df, binary_per_text=True)
+    fig,ax = plt.subplots(1,2)
+    count_parties(ax[0], df, by='section')
+    count_parties(ax[1], df, by='section', binary_per_text=True)
+
     plt.show()
