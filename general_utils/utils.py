@@ -119,6 +119,9 @@ def info_data_frame(df, verbose=1):
 def info_graph(G, verbose=1):
     print(f'\n\nGraph information:')
     n = G.number_of_nodes()
+    if n==0:
+        print('Empty graph.')
+        return
     m = G.number_of_edges()
     self_loops = G.number_of_selfloops()
     print(f'Nodes: {n:d}\t\tEdges: {m:d}\t\t' +
