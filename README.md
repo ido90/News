@@ -1,6 +1,23 @@
-# Abstract: Scraping and Analysis of Hebrew Newspapers
+# Scraping and Analysis of Hebrew Newspapers
+# Abstract
 
 TODO
+
+
+## Contents
+
+<!--ts-->
+
+[Data](#data)
+
+[Politicians and Parties Appearance Analysis](#politicians-and-parties-appearance-analysis)
+
+[Bag-of-Words Classification](#bag-of-words-classification)
+
+[Context-based Embedding](#context-based-embedding)
+
+<!--te-->
+
 _________________________________
 
 # Data
@@ -13,7 +30,7 @@ For more anomalies and some basic properties of the data, see 'Output/Data descr
 
 ![](https://github.com/ido90/News/blob/master/Output/Data%20description%20and%20validation/basic_data_description.png)
 
-# Scope and Limitations
+## Scope and Limitations
 Due to the choice to work with Hebrew text, many of the state-of-the-art of NLP conventional processing steps was of low availability (e.g. stemming, tagging of part-of-speech, syntax parsing, semantic entity classification, etc.).
 
 In particular, the absence of a stemmer has probably inserted incredible noise to the Bag-of-Words classification. Few stemmers were found (e.g. [here](https://github.com/iddoberger/awesome-hebrew-nlp)), but looked quite partial and complex to interface (in particular, none was implemented in Python).
@@ -118,10 +135,18 @@ No explicit regularization was used (e.g. Lasso or feature-selection), even thou
 
 _________________________________
 
-# TODO
+# Context-based Embedding
 
-Contexts
+TODO graph representation, spectral embedding, conductance?
 
-Graph of words with common articles
+## Word2vec
+Word2vec is a vectoric embedding of words, generated such that words with similar context are intended to be close to each other.
+Its implementation conceptually [resembles auto-encoders](https://www.tensorflow.org/tutorials/representation/word2vec), though the compressing network aims to reconstruct the word's context (usually defined by skip-grams) rather than the word itself.
 
-word2vec
+Word2vec embedding often has very nice geometric properties. For example, the difference between the embeddings of a country and its capital city is around a constant vector, so in particular one should have 'Berlin'-'Germany'+'Israel'='Tel-Aviv'.
+
+Unfortunately, it turned out to be quite challenging to train a word2vec model for the data of Hebrew articles. While it is possible that the training process was poorly-tuned, it seems more likely that ~18.5K Hebrew sentences with their un-stemmed, highly-variating Hebrew-words suffixes, are just not enough data (e.g. compared to the hundreds of thousands sentences [here](https://www.kaggle.com/c/word2vec-nlp-tutorial)).
+
+The close word2vec-neighborhood of a few selected words in the data is shown below using [t-SNE](https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding) embedding.
+
+![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/word2vec_sample_of_neighborhoods.png)
