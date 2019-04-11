@@ -1,12 +1,16 @@
 import pandas as pd
 import numpy as np
+import scipy as sp
 import matplotlib.pyplot as plt
+import networkx as nx
+from scipy.linalg import eigh
 import re
 import time
 from pprint import pprint
 from warnings import warn
 from datetime import datetime
 import itertools
+import bidi.algorithm as bidi
 import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 
@@ -44,7 +48,12 @@ def table(l, sort=0):
         tab = sorted(tab, key = lambda x: np.sign(sort)*x[1])
     return tab
 
-def info(df, verbose=1):
+def info(x, **kwargs):
+    if isinstance(x, pd.DataFrame): info_data_frame(x, **kwargs)
+    elif isinstance(x, nx.Graph): info_graph(x, **kwargs)
+    else: print(f'Unsupported type: {type(x):s}')
+
+def info_data_frame(df, verbose=1):
     assert(isinstance(df,pd.DataFrame)),\
         f'Bad type (not a DataFrame): {type(df):s}'
     print(f'\n\nData-Frame information:')
@@ -106,6 +115,47 @@ def info(df, verbose=1):
             print(df.tail(5))
         print('')
     # add optional plots if verbose >= 3?
+
+def info_graph(G, verbose=1):
+    print(f'\n\nGraph information:')
+    n = G.number_of_nodes()
+    m = G.number_of_edges()
+    self_loops = G.number_of_selfloops()
+    print(f'Nodes: {n:d}\t\tEdges: {m:d}\t\t' +
+          f'Density: {100*(m-self_loops)/sp.special.binom(n,2):.0f}%\t\t' +
+          f'Self-loops: {100*self_loops/n:.0f}%')
+    CC = nx.algorithms.components.number_connected_components(G)
+    C = max(nx.connected_component_subgraphs(G), key=len)
+    print(f'Connectivity components: {CC:d}\t\t' +
+          f'Largest component: {len(C):d} nodes')
+    print('Clustering coefficient:\t{0:.0f}%'.format(
+        100*nx.algorithms.cluster.average_clustering(G)))
+    print('Distribution of degrees:')
+    print(*[0,10,50,90,100], sep='%\t')
+    print(dist(list(G.degree().values()), do_round=True)[2:])
+    if verbose >= 2:
+        print('Largest component diameter:\t{0:d}'.format(
+            nx.algorithms.distance_measures.diameter(C) ))
+        # Spectrum
+        L = nx.laplacian_matrix(G)
+        x, v = eigh(L.todense())
+        print('Spectral-estimated number of clusters:\t{0:d}'.format(
+            np.argmax(np.diff(x)) + 1 ))
+        if n <= 100:
+            fig, ax = plt.subplots(1, 1)
+            barplot(ax, list(range(n)), x, ylab='Eigenvalue', colors='b')
+            draw()
+        else:
+            print('Distribution of Laplacian spectrum:')
+            print(*[0,10,50,90,100], sep='%\t')
+            print(dist(x)[2:])
+        if verbose >= 3:
+            if n <= 1000:
+                fig, ax = plt.subplots(1, 1)
+                plt.axes(ax)
+                Gtmp = nx.relabel_nodes(
+                    G, {w: bidi.get_display(w) for w in G.node}, True)
+                nx.draw(Gtmp, with_labels=True, edge_color='green')
 
 def count(txt, sep):
     '''
