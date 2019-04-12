@@ -21,7 +21,7 @@ import Analyzer.Semantics as sm
 
 #################   CONTEXT-BASED GRAPH REPRESENTATION   #################
 
-def words_incidence_matrix(df, voc, col='text', per='article',
+def words_vs_texts_incidence_matrix(df, voc, col='text', per='article',
                            normalize=False, min_abs=0, min_perc=0, binary=False):
     # get list of texts
     data = list()
@@ -140,8 +140,6 @@ def words2sections(G, df, to_plot=False, title=''):
                   for i, sec in enumerate(sections)}
         G2 = nx.relabel_nodes(
             G, {w: bidi.get_display(w) for w in G.node}, True)
-        # nx.draw(G2, with_labels=True, edge_color='pink',
-        #         node_color=[colors[G2.node[w]['section']] for w in G2.node])
         pos = nx.spring_layout(G2)
         for sec in sections:
             nx.draw_networkx_nodes(G2, pos=pos, node_color=colors[sec],
@@ -242,18 +240,6 @@ if __name__ == "__main__":
         voc = list(np.random.choice(voc, voc_samples, replace=False))
         print(f"Vocabulary shrunk ({len(voc):d} words) ({time()-t0:.0f} [s]).")
 
-    # Words that share articles
-    # G1 = graph_of_words(voc, D=words_incidence_matrix(df, voc, min_abs=2, binary=True))
-    # print(f'Graph of shared articles generated ({time()-t0:.0f} [s]).')
-    # utils.info(G1, verbose=1)
-    # print(f'Graph of shared articles diagnosed ({time()-t0:.0f} [s]).')
-    # fig,ax = plt.subplots()
-    # words2sections(G1, df, True)
-    # A = nx.adj_matrix(G1).todense()
-    # y = SpectralClustering(10).fit(A)
-    # fig, ax = plt.subplots(1)
-    # ax.scatter([A[:,0]], [A[:,1]], c=y.labels_)
-
     # Graph of shared skip-grams neighbors
     if build_graphs:
         A, D, full_voc = words_2gram_adj_matrix(
@@ -268,12 +254,7 @@ if __name__ == "__main__":
     print(f'Graph of 2-grams diagnosed ({time()-t0:.0f} [s]).')
     fig,ax = plt.subplots()
     words2sections(G, df, to_plot=True, title='2-gram context based similarities')
-    # TODO
-    # A = nx.adj_matrix(G).todense()
-    # y = SpectralClustering(10).fit(A)
-    # fig, ax = plt.subplots(1)
-    # ax.scatter([A[:,0]], [A[:,1]], c=y.labels_)
-    # Cliques
+
     if detailed_cliques:
         for c in nx.algorithms.clique.find_cliques(G):
             if len(c) > 2: print(c)
@@ -296,7 +277,3 @@ if __name__ == "__main__":
         tsne_plot(model, w, ax=axs[int(i/2), i%2])
 
     plt.show()
-
-
-# TODO clustering (connectivity / cliques / small-conductance / others)
-# TODO plannar embedding (represent using eigenvectors of A) (P. 10)?

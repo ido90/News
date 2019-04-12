@@ -159,6 +159,17 @@ def info_graph(G, verbose=1):
                 Gtmp = nx.relabel_nodes(
                     G, {w: bidi.get_display(w) for w in G.node}, True)
                 nx.draw(Gtmp, with_labels=True, edge_color='green')
+                if verbose >= 4:
+                    # spectral embedding of both Graph & largest component
+                    fig, ax = plt.subplots()
+                    nx.draw(Gtmp, pos={w: (v[i, 1], v[i, 2])
+                                    for i,w in enumerate(Gtmp.node.keys())},
+                            with_labels=True, edge_color='green')
+                    Ctmp = max(nx.connected_component_subgraphs(Gtmp), key=len)
+                    fig, ax = plt.subplots()
+                    nx.draw(Ctmp, pos={w: (v[i, 1], v[i, 2])
+                                    for i,w in enumerate(Ctmp.node.keys())},
+                            with_labels=True, edge_color='green')
 
 def count(txt, sep):
     '''
@@ -177,7 +188,7 @@ def count(txt, sep):
 def draw():
     plt.get_current_fig_manager().window.showMaximized()
     plt.draw()
-    plt.pause(1e-17)
+    plt.pause(1e-10)
     plt.tight_layout()
 
 def clean_figure(ax):
