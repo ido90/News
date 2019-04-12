@@ -152,6 +152,16 @@ The figure below shows the skip-gram based graph representation of the common wo
 
 ![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/2gram_based_graph.png)
 
+## Spectral clustering
+The Laplacian of the context-based graph of words has quite smooth empirical spectrum and in particular no gaps in small eigenvalues, hence spectral clustering (small-conductance components, or sparsest-cuts) does not look very promising.
+![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/spectrum.png)
+
+A simpler variant - binary clustering based on min-cut between 2 arbitrary nodes - was tried nonetheless, and seems to reasonably separate many news-oriented terms (in red) from other vocabularies (economy, sport, food, etc).
+![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/min_cut_clustering_demo.png)
+
+As an interesting possible extension, the min-cut clustering can go on iteratively (e.g. each iteration split the largest remaining cluster), and possibly cluster the words with accordance to the sections they're mostly associated with.
+This is out of the scope of this project.
+
 ## Word2vec
 Word2vec is a vectoric embedding of words, generated such that words with similar context are intended to be close to each other.
 Its implementation conceptually [resembles auto-encoders](https://www.tensorflow.org/tutorials/representation/word2vec), though the compressing network aims to reconstruct the word's context (usually defined by [skip-grams](https://www.kdnuggets.com/2018/04/implementing-deep-learning-methods-feature-engineering-text-data-skip-gram.html)) rather than the word itself.
