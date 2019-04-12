@@ -137,16 +137,22 @@ _________________________________
 
 # Context-based Embedding
 
-TODO graph representation, spectral embedding, conductance?
-
 ## Word2vec
 Word2vec is a vectoric embedding of words, generated such that words with similar context are intended to be close to each other.
-Its implementation conceptually [resembles auto-encoders](https://www.tensorflow.org/tutorials/representation/word2vec), though the compressing network aims to reconstruct the word's context (usually defined by skip-grams) rather than the word itself.
+Its implementation conceptually [resembles auto-encoders](https://www.tensorflow.org/tutorials/representation/word2vec), though the compressing network aims to reconstruct the word's context (usually defined by [skip-grams](https://www.kdnuggets.com/2018/04/implementing-deep-learning-methods-feature-engineering-text-data-skip-gram.html)) rather than the word itself.
 
 Word2vec embedding often has very nice geometric properties. For example, the difference between the embeddings of a country and its capital city is around a constant vector, so in particular one should have 'Berlin'-'Germany'+'Israel'='Tel-Aviv'.
 
-Unfortunately, it turned out to be quite challenging to train a word2vec model for the data of Hebrew articles. While it is possible that the training process was poorly-tuned, it seems more likely that ~18.5K Hebrew sentences with their un-stemmed, highly-variating Hebrew-words suffixes, are just not enough data (e.g. compared to the hundreds of thousands sentences [here](https://www.kaggle.com/c/word2vec-nlp-tutorial)).
+Unfortunately, it turned out to be quite challenging to train a word2vec model for the data of Hebrew articles. While it is possible that the training process was poorly-tuned, it seems likely that ~18.5K Hebrew sentences with un-stemmed, highly-variating Hebrew-words suffixes, are just not enough data (e.g. compared to the hundreds of thousands sentences [here](https://www.kaggle.com/c/word2vec-nlp-tutorial)).
 
-The close word2vec-neighborhood of a few selected words in the data is shown below using [t-SNE](https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding) embedding.
+The close word2vec-neighborhood of a few selected words in the data is shown below using [t-SNE](https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding) visualization.
 
 ![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/word2vec_sample_of_neighborhoods.png)
+
+## Graph representation
+The frequently-used words (~300 words with 70+ appearances) were formed as a graph, where the links were determined by some variant of skip-gram.
+In particular, the context of a word was defined as all the words that appear at least thrice in -2<=offset<=2; and words were defined to be linked if their contexts shared at least two words.
+
+The figure below shows the skip-gram based graph representation of the common words in the articles. The section assigned to every word was determined simply as the section with most appearances of the word.
+
+![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/2gram_based_graph.png)
