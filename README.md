@@ -1,8 +1,15 @@
 # Scraping and Analysis of Hebrew Newspapers
+
 # Abstract
+This project crawled various sections of 3 Hebrew news websites (Haaretz, Ynet, Mako) in March 2019, and scraped ~700 articles.
 
-TODO
+A simple count of names of parties & politicians demonstrated over-representation of Netanyahu and under-representation of religious and Arab parties, which is a predictable property of the chosen websites.
+More interestingly, Halikud, Cahol-lavan and Hayamin Hahadash were mostly represented by their leaders, whereas Haavoda and Meretz were mostly represented by the name of the party.
 
+A classification of articles into sections was demonstrated using the simple Bag-of-Words approach, and achieved accuracy of ~85% over 4 equal sections with as few as 50 training samples.
+Furthermore, it was shown that a section can also be assigned to a stand-alone cited paragraph with accuracy of ~75%.
+
+Parts of the vocabulary of the articles were embedded according to context-based similarity of words. Skip-gram-based word2vec seemed quite rough and inaccurate, which is believed to be caused by both complexity of Hebrew (with many variants of suffixes that were not stemmed) and too little data.
 
 ## Contents
 
@@ -137,6 +144,14 @@ _________________________________
 
 # Context-based Embedding
 
+## Graph representation
+The frequently-used words (~300 words with 70+ appearances) were formed as a graph, where the links were determined by some variant of skip-gram.
+In particular, the context of a word was defined as all the words that appear at least thrice in -2<=offset<=2; and words were defined to be linked if their contexts shared at least two words.
+
+The figure below shows the skip-gram based graph representation of the common words in the articles. The section assigned to every word was determined simply as the section with most appearances of the word.
+
+![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/2gram_based_graph.png)
+
 ## Word2vec
 Word2vec is a vectoric embedding of words, generated such that words with similar context are intended to be close to each other.
 Its implementation conceptually [resembles auto-encoders](https://www.tensorflow.org/tutorials/representation/word2vec), though the compressing network aims to reconstruct the word's context (usually defined by [skip-grams](https://www.kdnuggets.com/2018/04/implementing-deep-learning-methods-feature-engineering-text-data-skip-gram.html)) rather than the word itself.
@@ -148,11 +163,3 @@ Unfortunately, it turned out to be quite challenging to train a word2vec model f
 The close word2vec-neighborhood of a few selected words in the data is shown below using [t-SNE](https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding) visualization.
 
 ![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/word2vec_sample_of_neighborhoods.png)
-
-## Graph representation
-The frequently-used words (~300 words with 70+ appearances) were formed as a graph, where the links were determined by some variant of skip-gram.
-In particular, the context of a word was defined as all the words that appear at least thrice in -2<=offset<=2; and words were defined to be linked if their contexts shared at least two words.
-
-The figure below shows the skip-gram based graph representation of the common words in the articles. The section assigned to every word was determined simply as the section with most appearances of the word.
-
-![](https://github.com/ido90/News/blob/master/Output/Context%20based%20embedding/2gram_based_graph.png)
