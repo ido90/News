@@ -25,6 +25,11 @@ Parts of the vocabulary of the articles were embedded according to context-based
 
 <!--te-->
 
+## TODO
+
+Try NBSVM classifier [[1](https://www.kaggle.com/jhoward/nb-svm-strong-linear-baseline)]
+[[2](https://sijunhe.github.io/blog/2018/04/03/nb-svm/)]
+[[3](https://github.com/scotthlee/document_classification/blob/master/nbsvm.py)].
 _________________________________
 
 # Data
